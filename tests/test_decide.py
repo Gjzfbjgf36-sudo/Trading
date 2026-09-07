@@ -464,3 +464,88 @@ def test_the_report_names_every_profile():
     text = report(equity=Decimal("1000"), fee_rate=Decimal("0.0026"))
     for profile in COMMON_PROFILES:
         assert profile.name in text
+
+
+# --- setup check ---------------------------------------------------------
+
+
+def test_setup_names_the_missing_config(tmp_path):
+    from arbcore.decide.setup_check import run_checks
+
+    lines, next_step = run_checks(str(tmp_path / "nope.yaml"))
+    assert not lines[0].ok
+    assert "decide.example.yaml" in lines[0].detail
+    assert "Lege" in next_step
+
+
+def _write_config(tmp_path, **overrides) -> str:
+    import yaml
+
+    data = {
+        "starting_capital": "1000",
+        "fee_rate": "0.0026",
+        "journal_path": str(tmp_path / "j.sqlite"),
+    }
+    data.update(overrides)
+    path = tmp_path / "decide.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    return str(path)
+
+
+def test_a_complete_setup_reports_the_next_step(tmp_path):
+    from arbcore.decide.setup_check import run_checks
+
+    lines, next_step = run_checks(_write_config(tmp_path))
+    assert all(line.ok for line in lines), [x.label for x in lines if not x.ok]
+    # A fresh journal is told to go and wait for the first signal, and that
+    # waiting weeks is normal rather than broken.
+    assert "TradingView" in next_step
+    assert "normal" in next_step
+
+
+def test_an_implausible_fee_is_flagged(tmp_path):
+    """The number most often wrong, and it decides what is affordable."""
+    from arbcore.decide.setup_check import run_checks
+
+    lines, next_step = run_checks(_write_config(tmp_path, fee_rate="0.00001"))
+    fee_line = next(line for line in lines if line.label == "Gebührensatz")
+    assert not fee_line.ok
+    assert "Gebührensatz" in next_step
+
+
+def test_real_money_is_flagged_as_not_yet_appropriate(tmp_path):
+    from arbcore.decide.setup_check import run_checks
+
+    lines, next_step = run_checks(_write_config(tmp_path, real_money=True))
+    mode = next(line for line in lines if line.label == "Modus")
+    assert not mode.ok
+    assert "ANLEITUNG" in mode.detail
+    assert "real_money" in next_step
+
+
+def test_a_broken_config_is_reported_rather_than_crashing(tmp_path):
+    from arbcore.decide.setup_check import run_checks
+
+    path = tmp_path / "bad.yaml"
+    path.write_text("starting_capital: '1000'\nfee_rate: '0.26'\n", encoding="utf-8")
+    lines, next_step = run_checks(str(path))
+    assert not lines[-1].ok
+    assert "Korrigiere" in next_step
+
+
+def test_the_rule_files_are_found_regardless_of_working_directory(tmp_path, monkeypatch):
+    """Someone setting this up will run it from wherever they happen to be."""
+    from arbcore.decide.setup_check import run_checks
+
+    config = _write_config(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    lines, _ = run_checks(config)
+    rules = next(line for line in lines if line.label.startswith("Regeln"))
+    assert rules.ok
+    assert "donchian" in rules.detail
+
+
+def test_the_report_always_ends_with_one_next_step(tmp_path):
+    from arbcore.decide.setup_check import report
+
+    assert "NÄCHSTER SCHRITT" in report(_write_config(tmp_path))

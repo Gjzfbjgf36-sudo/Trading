@@ -49,6 +49,7 @@ hast, sagt dir ob und wie groß — und hält fest, was du vorher behauptet hast
 
 ```bash
 cp config/decide.example.yaml config/decide.yaml   # einmalig, eigene Zahlen eintragen
+python -m arbcore.app.run_gate setup               # was fehlt, und was der nächste Schritt ist
 python -m arbcore.app.run_gate wizard              # geführt: prüfen und Plan festhalten
 python -m arbcore.app.run_gate serve --token ...   # optional: TradingView-Webhook
 ```
@@ -114,7 +115,7 @@ favourable probabilities; an unmonitored condition is not a healthy one.
 
 ```bash
 make install
-make check      # ruff + mypy --strict + pytest (396 tests)
+make check      # ruff + mypy --strict + pytest (409 tests)
 
 # The honest scenario: retail fees, calm spreads
 python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario realistic

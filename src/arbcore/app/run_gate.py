@@ -23,6 +23,7 @@ from ..decide.costcheck import report as cost_report
 from ..decide.gate import GateConfig, Signal, SignalGate
 from ..decide.journal import ExitReason, Journal, PlanIncomplete
 from ..decide.settings import DEFAULT_PATH, DecideSettings, SettingsError, load_settings
+from ..decide.setup_check import report as setup_report
 from ..decide.webhook import SignalQueue, make_server
 from ..domain.types import Side
 from ..review.performance import deviation_comparison, review_journal
@@ -164,6 +165,7 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("status", help="Kontostand, Drawdown, offene Positionen")
+    sub.add_parser("setup", help="Ist alles eingerichtet? Was ist der nächste Schritt?")
     check = sub.add_parser("check", help="Darf dieser Trade laufen, und wie groß?")
     _add_signal_args(check)
     commit = sub.add_parser("commit", help="Plan für ein grünes Signal festhalten")
@@ -199,10 +201,15 @@ def main() -> int:
     args = parser.parse_args()
     now = datetime.now(UTC)
 
+    if args.command == "setup":
+        print(setup_report(args.config))
+        return 0
+
     try:
         settings = load_settings(args.config)
     except SettingsError as exc:
         print(f"Konfiguration: {exc}")
+        print("\nTipp: `python -m arbcore.app.run_gate setup` sagt dir, was fehlt.")
         return 2
 
     if args.command == "costcheck":

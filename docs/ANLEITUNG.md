@@ -10,6 +10,23 @@ ob deine Regel gut ist. Es kann dir keinen Gewinn verschaffen.
 
 ---
 
+## Was du am ersten Tag realistisch erreichst
+
+Etwa 45 Minuten Arbeit, und danach ist alles bereit. Was du **nicht** erreichst:
+einen Trade. Deine Regel gibt rund 2 Signale im Monat — das erste kann drei
+Wochen entfernt sein. Das ist kein Fehler im Aufbau, das ist die Strategie.
+
+| Zeit | Was |
+|---|---|
+| 10 Min | `config/decide.yaml` anlegen, Gebührensatz nachschlagen und eintragen |
+| 5 Min | `run_gate setup` — sagt dir, ob etwas fehlt |
+| 5 Min | `run_gate costcheck` — zeigt, was deine Gebühren tragen |
+| 20 Min | TradingView: Script laden, Kommission und Slippage setzen, Backtest ansehen |
+| 5 Min | Alerts anlegen (Einstieg und Ausstieg), Handy-Push aktivieren |
+
+Danach: warten. Wochenlang, unter Umständen. Das auszuhalten ist der erste Test,
+und mehr Leute scheitern daran als an der Regel.
+
 ## Phase 0 — mit 0 € anfangen
 
 Du brauchst **kein Börsenkonto**. Nur:
@@ -34,8 +51,11 @@ Kontogröße würde die Positionsgröße verfälschen, ohne dass es jemandem auf
 Prüfen mit:
 
 ```bash
-python -m arbcore.app.run_gate status
+python -m arbcore.app.run_gate setup
 ```
+
+Das sagt dir, was fehlt und was der nächste Schritt ist — und zwar immer nur
+**einer**. Wenn du nicht weiterweißt, ist dieser Befehl die Antwort.
 
 Dauer: mindestens 3 Monate oder 30 abgeschlossene Trades — je nachdem, was
 länger dauert. Vorher sagen die Zahlen nichts.
