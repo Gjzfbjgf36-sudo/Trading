@@ -59,13 +59,44 @@ CREATE TABLE IF NOT EXISTS pending_signals (
     source      TEXT    NOT NULL,
     verdict     TEXT    NOT NULL,
     explanation TEXT    NOT NULL,
-    acted_on    INTEGER NOT NULL DEFAULT 0
+    acted_on    INTEGER NOT NULL DEFAULT 0,
+    kind        TEXT    NOT NULL DEFAULT 'ENTRY'
 );
 """
 
 
 class InvalidPayload(ValueError):
     """Raised when an alert body is not something we will act on."""
+
+
+@dataclass(frozen=True, slots=True)
+class ExitNotice:
+    """The rule says get out.
+
+    Exit alerts are **not** put through the gate. The gate exists to stop new
+    risk being taken; an exit reduces risk, and a check that could block one
+    would be a check that traps you in a position. Nothing in this system may
+    stand between you and the door.
+    """
+
+    ref: str
+    symbol: str
+    price: Decimal
+    reason: str
+    source: str
+    received_at: datetime
+
+    def explain(self) -> str:
+        return "\n".join(
+            [
+                f"VERKAUFEN  {self.symbol}",
+                f"  Kurs jetzt     {self.price}",
+                f"  Grund          {self.reason}",
+                f"  Regel          {self.source}",
+                "",
+                "Position schliessen, dann mit `run_gate close` eintragen.",
+            ]
+        )
 
 
 def extract_token(body: bytes) -> str:
@@ -85,8 +116,8 @@ def extract_token(body: bytes) -> str:
     return value if isinstance(value, str) else ""
 
 
-def parse_alert(body: bytes, *, now: datetime) -> Signal:
-    """Parse a TradingView alert body into a signal.
+def parse_alert(body: bytes, *, now: datetime) -> Signal | ExitNotice:
+    """Parse a TradingView alert body into an entry signal or an exit notice.
 
     Strict on purpose. Every field is required and validated; nothing is
     defaulted. A malformed alert is not a slightly worse signal, it is not a
@@ -105,15 +136,6 @@ def parse_alert(body: bytes, *, now: datetime) -> Signal:
     # removed here so it cannot reach the queue, a log line or a response.
     payload.pop("token", None)
 
-    required = ("ref", "symbol", "side", "entry", "stop", "source")
-    missing = [key for key in required if key not in payload]
-    if missing:
-        raise InvalidPayload(f"missing fields: {', '.join(missing)}")
-
-    side_raw = str(payload["side"]).upper()
-    if side_raw not in ("BUY", "SELL"):
-        raise InvalidPayload(f"side must be BUY or SELL, got {side_raw!r}")
-
     def number(key: str) -> Decimal:
         try:
             value = Decimal(str(payload[key]))
@@ -123,16 +145,42 @@ def parse_alert(body: bytes, *, now: datetime) -> Signal:
             raise InvalidPayload(f"{key} must be a positive finite number")
         return value
 
-    ref = str(payload["ref"]).strip()
-    if not ref or len(ref) > 128:
-        raise InvalidPayload("ref must be a non-empty string of at most 128 characters")
+    def reference() -> str:
+        ref = str(payload.get("ref", "")).strip()
+        if not ref or len(ref) > 128:
+            raise InvalidPayload(
+                "ref must be a non-empty string of at most 128 characters"
+            )
+        return ref
+
+    if str(payload.get("action", "")).upper() == "EXIT":
+        missing_exit = [k for k in ("ref", "symbol", "price", "source") if k not in payload]
+        if missing_exit:
+            raise InvalidPayload(f"missing fields: {', '.join(missing_exit)}")
+        return ExitNotice(
+            ref=reference(),
+            symbol=str(payload["symbol"])[:32],
+            price=number("price"),
+            reason=str(payload.get("reason", "SIGNAL_EXIT"))[:64],
+            source=str(payload["source"])[:128],
+            received_at=now,
+        )
+
+    required = ("ref", "symbol", "side", "entry", "stop", "source")
+    missing = [key for key in required if key not in payload]
+    if missing:
+        raise InvalidPayload(f"missing fields: {', '.join(missing)}")
+
+    side_raw = str(payload["side"]).upper()
+    if side_raw not in ("BUY", "SELL"):
+        raise InvalidPayload(f"side must be BUY or SELL, got {side_raw!r}")
 
     target = None
     if payload.get("target") not in (None, ""):
         target = number("target")
 
     return Signal(
-        ref=ref,
+        ref=reference(),
         symbol=str(payload["symbol"])[:32],
         side=Side(side_raw),
         entry=number("entry"),
@@ -172,6 +220,31 @@ class SignalQueue:
         self.conn.commit()
         self.conn.close()
         self._conn = None
+
+    def record_exit(self, notice: ExitNotice, *, now: datetime) -> bool:
+        """Store an exit notice. Returns False if this ref was already seen."""
+        try:
+            self.conn.execute(
+                "INSERT INTO pending_signals"
+                "(ref, received_at, symbol, side, entry, stop, source,"
+                " verdict, explanation, kind)"
+                " VALUES (?,?,?,?,?,?,?,?,?,'EXIT')",
+                (
+                    notice.ref,
+                    now.isoformat(),
+                    notice.symbol,
+                    "EXIT",
+                    str(notice.price),
+                    str(notice.price),
+                    notice.source,
+                    "VERKAUFEN",
+                    notice.explain(),
+                ),
+            )
+        except sqlite3.IntegrityError:
+            return False
+        self.conn.commit()
+        return True
 
     def record(self, verdict: GateVerdict, *, now: datetime) -> bool:
         """Store a verdict. Returns False if this ref was already seen."""
@@ -252,15 +325,23 @@ class _Handler(BaseHTTPRequestHandler):
 
         now = datetime.now(UTC)
         try:
-            signal = parse_alert(body, now=now)
+            parsed = parse_alert(body, now=now)
         except InvalidPayload as exc:
             # The reason is safe to return: it describes the caller's own body.
             self._respond(400, str(exc))
             return
 
-        verdict = self.gate.evaluate(signal, self.account_provider(), now=now)
-        fresh = self.queue.record(verdict, now=now)
-        if not fresh:
+        if isinstance(parsed, ExitNotice):
+            # Never gated. An exit reduces risk, and a check that could block
+            # one would trap the user in a position.
+            if not self.queue.record_exit(parsed, now=now):
+                self._respond(200, "duplicate")
+                return
+            self._respond(202, "EXIT")
+            return
+
+        verdict = self.gate.evaluate(parsed, self.account_provider(), now=now)
+        if not self.queue.record(verdict, now=now):
             self._respond(200, "duplicate")
             return
         self._respond(202, "GREEN" if verdict.green else "NO")

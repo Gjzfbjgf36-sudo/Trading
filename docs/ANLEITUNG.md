@@ -153,6 +153,31 @@ hast — nicht, was du dich zu denken erinnerst.
 
 ---
 
+## Wann verkaufe ich? — steht immer schon fest
+
+```bash
+python -m arbcore.app.run_gate open
+```
+
+```
+BTC-1  BTCUSD BUY  Menge 0.00302645
+    Einstieg war    60000
+    VERKAUFEN bei   57000   (Stop — Verlust begrenzen)
+    ODER bei        66000   (Ziel)
+    ODER wenn       Schlusskurs unter 57000 oder 10 Kerzen ohne Bewegung
+```
+
+Die Antwort auf „soll ich jetzt verkaufen?" steht dort, seit du eingestiegen
+bist. Sie wird nicht dadurch besser, dass du sie neu überdenkst, während die
+Position im Minus ist.
+
+**Ausstiegsmeldungen laufen nie durch das Gate.** Das Gate verhindert, dass du
+neues Risiko eingehst — ein Ausstieg *reduziert* Risiko. Eine Prüfung, die
+einen Ausstieg blockieren könnte, wäre eine Prüfung, die dich in einer Position
+festhält. Nichts in diesem System darf zwischen dir und der Tür stehen.
+
+---
+
 ## Schritt 4 — Position schließen
 
 ```bash
@@ -260,7 +285,29 @@ Feld „Webhook token" auf denselben Wert setzen.
 **4. Alert anlegen.** Bedingung: die Strategie. In „Webhook URL" deine Adresse
 eintragen, ins Nachrichtenfeld `{{strategy.order.alert_message}}`.
 
-**5. Empfangene Signale ansehen:**
+**5. Alerts anlegen — zwei Stück.** Eines für den Einstieg, eines für den
+Ausstieg. Beide zeigen auf dieselbe URL, ins Nachrichtenfeld kommt jeweils
+`{{strategy.order.alert_message}}`.
+
+Aktiviere in TradingView zusätzlich die **Push-Benachrichtigung aufs Handy**.
+Dann sieht es genau so aus, wie du es dir vorstellst:
+
+```
+     Handy vibriert
+          ↓
+GRÜN  BTCUSD  BUY
+  Einstieg       60000
+  Stop           57000   <- sofort setzen
+  Menge          0.00302645
+          ↓
+     … Tage später, Handy vibriert wieder
+          ↓
+VERKAUFEN  BTCUSD
+  Kurs jetzt     66000
+  Grund          SIGNAL_EXIT
+```
+
+**6. Empfangene Signale ansehen:**
 
 ```bash
 python -m arbcore.app.run_gate pending

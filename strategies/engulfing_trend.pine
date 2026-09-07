@@ -91,3 +91,15 @@ alert_entry = str.format(
 
 if long_signal and strategy.position_size == 0
     alert(alert_entry, alert.freq_once_per_bar_close)
+
+// Ausstiegsmeldung. Stop und Ziel liegen als Order im Markt, aber der
+// Zeit-Stop nicht — und ohne Meldung würde er stillschweigend verstreichen.
+alert_exit = str.format(
+     '{{"token":"{0}","ref":"{1}-{2}","symbol":"{3}","action":"EXIT","price":{4},"reason":"SIGNAL_EXIT","source":"engulfing_ema{5}_r{6}"}}',
+     webhook_token, syminfo.ticker, str.tostring(time), syminfo.ticker,
+     str.tostring(close), str.tostring(trend_len), str.tostring(target_r))
+
+exit_now = strategy.position_size > 0 and
+     bar_index - strategy.opentrades.entry_bar_index(0) >= time_stop
+if exit_now
+    alert(alert_exit, alert.freq_once_per_bar_close)

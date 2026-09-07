@@ -257,11 +257,19 @@ class Journal:
 
     # --- reading -------------------------------------------------------
     def open_positions(self) -> tuple[dict[str, str], ...]:
+        """Open commitments, including the conditions under which they close.
+
+        The exit belongs next to the entry: "when do I sell" is answered by
+        what was committed to, not by how the position feels today.
+        """
         rows = self.conn.execute(
-            "SELECT ref, symbol, side, entry, stop, quantity, thesis"
+            "SELECT ref, symbol, side, entry, stop, target, quantity, thesis,"
+            " invalidation, signal_source"
             " FROM commitments WHERE closed_at IS NULL ORDER BY opened_at"
         ).fetchall()
-        return tuple({k: str(r[k]) for k in r.keys()} for r in rows)
+        return tuple(
+            {k: ("" if r[k] is None else str(r[k])) for k in r.keys()} for r in rows
+        )
 
     def realised_pnl(self) -> Decimal:
         row = self.conn.execute(

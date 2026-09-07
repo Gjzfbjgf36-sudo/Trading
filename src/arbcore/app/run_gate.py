@@ -273,9 +273,15 @@ def main() -> int:
             if not rows:
                 print("Keine offenen Positionen.")
             for row in rows:
-                print(f"{row['ref']}  {row['symbol']} {row['side']}  "
-                      f"Einstieg {row['entry']}  Stop {row['stop']}  Menge {row['quantity']}")
-                print(f"    These: {row['thesis']}")
+                target = row["target"] or "keins (Ausstieg per Regel)"
+                print(f"{row['ref']}  {row['symbol']} {row['side']}  Menge {row['quantity']}")
+                print(f"    Einstieg war    {row['entry']}")
+                print(f"    VERKAUFEN bei   {row['stop']}   (Stop — Verlust begrenzen)")
+                print(f"    ODER bei        {target}   (Ziel)")
+                print(f"    ODER wenn       {row['invalidation']}")
+                print(f"    These           {row['thesis']}")
+                print(f"    Regel           {row['signal_source']}")
+                print()
             return 0
 
         if args.command == "review":

@@ -348,3 +348,104 @@ def test_the_token_never_becomes_part_of_the_signal():
     signal = parse_alert(good_body(token="super-secret-value"), now=NOW)
     rendered = f"{signal.ref}{signal.symbol}{signal.source}"
     assert "super-secret-value" not in rendered
+
+
+# --- exit alerts ---------------------------------------------------------
+
+
+def exit_body(**overrides) -> bytes:
+    import json
+
+    payload = {
+        "ref": "BTCUSD-exit-1",
+        "symbol": "BTCUSD",
+        "action": "EXIT",
+        "price": "62000",
+        "reason": "SIGNAL_EXIT",
+        "source": "donchian_55_20",
+    }
+    payload.update(overrides)
+    return json.dumps(payload).encode()
+
+
+def test_an_exit_alert_parses_as_an_exit_notice():
+    from arbcore.decide.webhook import ExitNotice
+
+    parsed = parse_alert(exit_body(), now=NOW)
+    assert isinstance(parsed, ExitNotice)
+    assert parsed.price == Decimal("62000")
+    assert "VERKAUFEN" in parsed.explain()
+
+
+def test_an_exit_alert_needs_its_own_required_fields():
+    import json
+
+    payload = json.loads(exit_body())
+    del payload["price"]
+    with pytest.raises(InvalidPayload, match="missing fields"):
+        parse_alert(json.dumps(payload).encode(), now=NOW)
+
+
+def test_an_exit_alert_carries_no_token_into_the_notice():
+    parsed = parse_alert(exit_body(token="super-secret-value"), now=NOW)
+    assert "super-secret-value" not in f"{parsed.ref}{parsed.source}{parsed.explain()}"
+
+
+def test_exit_notices_are_queued_and_deduplicated(queue):
+    from arbcore.decide.webhook import ExitNotice
+
+    notice = ExitNotice(
+        ref="X-1",
+        symbol="BTCUSD",
+        price=Decimal("62000"),
+        reason="SIGNAL_EXIT",
+        source="donchian_55_20",
+        received_at=NOW,
+    )
+    assert queue.record_exit(notice, now=NOW)
+    assert not queue.record_exit(notice, now=NOW)
+    pending = queue.pending()
+    assert pending[0]["verdict"] == "VERKAUFEN"
+    assert pending[0]["kind"] == "EXIT"
+
+
+def test_an_exit_is_never_blocked_by_the_gate(queue):
+    """Nothing in this system may stand between the user and the door."""
+    from arbcore.decide.webhook import ExitNotice
+
+    # An account deep in drawdown would refuse any entry.
+    notice = ExitNotice(
+        ref="X-2",
+        symbol="BTCUSD",
+        price=Decimal("40000"),
+        reason="STOP_HIT",
+        source="donchian_55_20",
+        received_at=NOW,
+    )
+    assert queue.record_exit(notice, now=NOW)
+    assert queue.pending()[0]["verdict"] == "VERKAUFEN"
+
+
+def test_open_positions_state_when_to_sell(tmp_path):
+    journal = Journal(tmp_path / "j.sqlite")
+    journal.commit_plan(
+        Commitment(
+            ref="T-1",
+            symbol="BTCUSD",
+            side=Side.BUY,
+            entry=Decimal("60000"),
+            stop=Decimal("57000"),
+            target=Decimal("66000"),
+            quantity=Decimal("0.003"),
+            risk_amount=Decimal("10"),
+            thesis=THESIS,
+            invalidation=INVALIDATION,
+            signal_source="donchian_55_20",
+        ),
+        now=NOW,
+    )
+    row = journal.open_positions()[0]
+    assert row["stop"] == "57000"
+    assert row["target"] == "66000"
+    assert row["invalidation"] == INVALIDATION
+    journal.close()

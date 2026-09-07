@@ -86,3 +86,14 @@ alert_entry = str.format(
 
 if long_signal and strategy.position_size == 0
     alert(alert_entry, alert.freq_once_per_bar_close)
+
+// Der Ausstieg ist genauso ein Signal wie der Einstieg — und der wichtigere:
+// einen Einstieg zu verpassen kostet eine Gelegenheit, einen Ausstieg zu
+// verpassen kostet Geld.
+alert_exit = str.format(
+     '{{"token":"{0}","ref":"{1}-{2}","symbol":"{3}","action":"EXIT","price":{4},"reason":"SIGNAL_EXIT","source":"donchian_{5}_{6}"}}',
+     webhook_token, syminfo.ticker, str.tostring(time), syminfo.ticker,
+     str.tostring(close), str.tostring(entry_len), str.tostring(exit_len))
+
+if exit_signal and strategy.position_size > 0
+    alert(alert_exit, alert.freq_once_per_bar_close)
