@@ -1,0 +1,42 @@
+# Risk limits — PAPER environment.
+#
+# Values are starting points for research, not recommendations, and are
+# deliberately conservative. Every change must be recorded in
+# docs/model-governance.md with old value, new value, reason and date.
+#
+# Amounts are in the accounting currency (USD). Fractions are decimals in [0,1].
+# Durations are milliseconds.
+version: 1
+risk_limits:
+  # --- size and exposure ---
+  max_trade_size: "500"
+  max_total_exposure: "5000"
+  max_asset_exposure: "2000"
+  max_exchange_exposure: "2000"
+  max_chain_exposure: "2000"
+
+  # --- loss and activity ---
+  max_daily_loss: "100"
+  max_daily_trades: 50
+  max_concurrent_trades: 2
+
+  # --- inventory ---
+  max_inventory_imbalance: "1000"
+  min_reserve_balance: "100"
+  max_rebalance_cost: "25"
+
+  # --- microstructure ---
+  # 10 bps slippage, 20 bps price impact.
+  max_slippage: "0.0010"
+  max_price_impact: "0.0020"
+  max_quote_age_ms: 1500
+  max_execution_latency_ms: 2000
+  max_clock_drift_ms: 500
+
+  # --- economics ---
+  # Net edge must clear 5 bps of notional after costs are inflated by 1.5x.
+  min_net_profit_margin: "0.0005"
+  cost_safety_factor: "1.5"
+  min_data_quality_score: "0.90"
+  # 50 bps peg deviation disables stablecoin-dependent strategies.
+  max_stablecoin_depeg: "0.0050"
