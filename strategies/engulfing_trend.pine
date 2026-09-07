@@ -1,0 +1,93 @@
+//@version=5
+// Bullish-Engulfing im Aufwärtstrend — die Kerzenmuster-Variante.
+//
+// WARUM DIESE FORM: Ein Muster ist exakt definierbar, also programmierbar,
+// also backtestbar. Genau das trennt eine Regel von einer Einschätzung. "Das
+// sieht aus wie ein Engulfing" ist keine Regel; die vier Vergleiche unten sind
+// eine.
+//
+// EHRLICH ZUR BEWEISLAGE: Klassische Kerzenmuster schneiden in veröffentlichten
+// Untersuchungen überwiegend schwach ab, besonders nach Kosten. Das ist kein
+// Grund, es nicht zu testen — es ist der Grund, es zu testen statt zu glauben.
+// Deine 30 Trades entscheiden das für deinen Markt, nicht die Literatur.
+//
+// WARUM EIN TRENDFILTER: Ein Muster ohne Kontext ist die schwächste Form. Nur
+// long, und nur oberhalb des langen Durchschnitts — das ist Standard und
+// verhindert, dass in jeder Abwärtsbewegung gekauft wird.
+//
+// PARAMETER: drei (Trendfilter, Ziel-Vielfaches, Zeit-Stop). Mehr als die zwei
+// bei Donchian, also mehr Gelegenheit zur Überanpassung. Wenn du sie drehst:
+// jede Variante zählt.
+//
+// TAGESKERZEN. Auf 5-Minuten-Kerzen liefert dasselbe Muster ein Vielfaches an
+// Signalen — und laut `costcheck` fressen die Gebühren das Konto auf, bevor
+// irgendein Kursgewinn entsteht.
+
+strategy("Bullish Engulfing im Trend (Tageskerzen, nur long)",
+     overlay = true,
+     initial_capital = 1000,
+     default_qty_type = strategy.percent_of_equity,
+     default_qty_value = 100,
+     commission_type = strategy.commission.percent,
+     commission_value = 0.26,        // auf DEINEN echten Taker-Satz setzen
+     slippage = 2,
+     process_orders_on_close = true)
+
+trend_len = input.int(200, "Trendfilter (EMA-Länge)", minval = 20, maxval = 400,
+     tooltip = "Nur kaufen, wenn der Kurs darüber liegt.")
+target_r  = input.float(2.0, "Ziel in R (Vielfaches des Risikos)", minval = 1.5, maxval = 5.0,
+     tooltip = "Unter 1.5 lehnt das Gate das Signal ohnehin ab.")
+time_stop = input.int(10, "Zeit-Stop (Kerzen)", minval = 3, maxval = 60,
+     tooltip = "Passiert nichts, ist die These nicht eingetreten. Kapital freigeben.")
+
+ema_trend = ta.ema(close, trend_len)
+in_uptrend = close > ema_trend
+
+// --- das Muster, als vier Vergleiche statt als Eindruck --------------------
+prev_bearish  = close[1] < open[1]              // Vorkerze rot
+curr_bullish  = close > open                    // aktuelle Kerze grün
+engulfs_body  = open <= close[1] and close >= open[1]
+has_substance = (close - open) > (high[1] - low[1]) * 0.5   // kein Doji
+
+engulfing = prev_bearish and curr_bullish and engulfs_body and has_substance
+
+// --- Ein- und Ausstieg ----------------------------------------------------
+// Der Stop kommt aus dem Muster selbst, nicht aus dem Bauch: unter das Tief
+// der beiden Kerzen. Damit ist er definiert, bevor der Einstieg feststeht —
+// und daraus folgt die Positionsgröße.
+pattern_low = math.min(low, low[1])
+risk_per_unit = close - pattern_low
+target_level  = close + risk_per_unit * target_r
+
+long_signal = engulfing and in_uptrend and risk_per_unit > 0
+
+plot(ema_trend, "Trendfilter", color = color.new(color.blue, 50))
+plotshape(long_signal, "Signal", shape.triangleup, location.belowbar,
+     color = color.new(color.teal, 0), size = size.tiny)
+plot(strategy.position_size > 0 ? strategy.position_avg_price : na, "Einstieg",
+     color = color.new(color.gray, 40))
+
+if long_signal and strategy.position_size == 0
+    strategy.entry("long", strategy.long)
+    strategy.exit("exit", "long", stop = pattern_low, limit = target_level)
+
+// Zeit-Stop: eine These, die sich nach N Kerzen nicht bewegt hat, ist nicht
+// eingetreten. Das Kapital hat woanders mehr zu suchen.
+if strategy.position_size > 0 and bar_index - strategy.opentrades.entry_bar_index(0) >= time_stop
+    strategy.close("long", comment = "Zeit-Stop")
+
+// --- Webhook ---------------------------------------------------------------
+// TradingView kann keine eigenen HTTP-Header senden, deshalb reist der Token
+// im Nachrichtentext mit. Ab dann ist dieses Script ein Geheimnis.
+webhook_token = input.string("CHANGE-ME-32-random-characters", "Webhook token",
+     confirm = true,
+     tooltip = "Muss zum --token von `run_gate serve` passen. Mindestens 24 zufällige Zeichen.")
+
+alert_entry = str.format(
+     '{{"token":"{0}","ref":"{1}-{2}","symbol":"{3}","side":"BUY","entry":{4},"stop":{5},"target":{6},"source":"engulfing_ema{7}_r{8}"}}',
+     webhook_token, syminfo.ticker, str.tostring(time), syminfo.ticker,
+     str.tostring(close), str.tostring(pattern_low), str.tostring(target_level),
+     str.tostring(trend_len), str.tostring(target_r))
+
+if long_signal and strategy.position_size == 0
+    alert(alert_entry, alert.freq_once_per_bar_close)

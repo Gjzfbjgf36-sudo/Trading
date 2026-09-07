@@ -44,8 +44,22 @@ länger dauert. Vorher sagen die Zahlen nichts.
 
 ## Schritt 1 — Die Regel in TradingView
 
+Es liegen zwei Regeln bei. **Nimm eine.** Beide parallel zu testen ist der
+Mehrfachtest-Fehler in klein: Bei zwei Kandidaten sieht einer besser aus, und
+zwar auch dann, wenn beide nichts taugen.
+
+| Datei | Was sie macht | Signale/Monat | Parameter |
+|---|---|---|---|
+| `strategies/donchian_trend.pine` | Ausbruch über das 55-Tage-Hoch | ~2 | 2 |
+| `strategies/engulfing_trend.pine` | Bullish-Engulfing im Aufwärtstrend | ~2–4 | 3 |
+
+Donchian hat weniger Stellschrauben und ist damit schwerer zu überanpassen.
+Engulfing ist anschaulicher — und eine Regel, die du drei Monate durchhältst,
+schlägt eine „bessere", die du nach zwei Wochen aufgibst. Nimm die, bei der du
+bleibst.
+
 1. TradingView öffnen → **Pine-Editor** unten.
-2. Inhalt von `strategies/donchian_trend.pine` einfügen → **Zum Chart hinzufügen**.
+2. Inhalt der gewählten Datei einfügen → **Zum Chart hinzufügen**.
 3. Chart auf **BTC/USD, Tageskerzen** stellen.
 
 Im **Strategie-Tester** siehst du jetzt, wie die Regel historisch gelaufen wäre.

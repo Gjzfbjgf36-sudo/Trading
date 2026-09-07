@@ -54,7 +54,9 @@ python -m arbcore.app.run_gate serve --token ...   # optional: TradingView-Webho
 ```
 
 Anleitung ohne Vorkenntnisse: **[docs/ANLEITUNG.md](docs/ANLEITUNG.md)**.
-Startregel für TradingView: `strategies/donchian_trend.pine`.
+Zwei Startregeln für TradingView — **eine** auswählen, nicht beide:
+`strategies/donchian_trend.pine` (Ausbruch, 2 Parameter) oder
+`strategies/engulfing_trend.pine` (Kerzenmuster im Trend, 3 Parameter).
 
 Es erzeugt keinen Edge. Es verhindert die Fehler, die kleine Konten zerlegen,
 und misst über 30+ Trades, ob deine Regel überhaupt eine ist.
