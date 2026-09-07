@@ -116,54 +116,53 @@ def review_journal(journal: Journal) -> str:
     r = collect(journal)
     if r.closed == 0:
         return (
-            f"No closed trades yet ({r.open_count} open).\n"
-            "Come back after 30. Before then there is nothing to conclude."
+            f"Noch keine abgeschlossenen Trades ({r.open_count} offen).\n"
+            "Komm nach 30 wieder. Vorher gibt es nichts zu schliessen."
         )
 
     lines = [
-        f"Closed trades      {r.closed}   (open: {r.open_count})",
-        f"Win rate           {r.win_rate}",
-        f"Average win        {r.average_win}",
-        f"Average loss       {r.average_loss}",
-        f"Payoff ratio       {r.payoff_ratio}",
-        f"Largest loss       {r.largest_loss}",
-        f"Net                {r.net}",
-        f"Expectancy/trade   {r.expectancy}",
-        f"Plan deviations    {r.deviations}",
+        f"Abgeschlossen       {r.closed}   (offen: {r.open_count})",
+        f"Trefferquote        {r.win_rate}",
+        f"Ø Gewinn            {r.average_win}",
+        f"Ø Verlust           {r.average_loss}",
+        f"Payoff-Verhältnis   {r.payoff_ratio}",
+        f"Grösster Verlust    {r.largest_loss}",
+        f"Netto               {r.net}",
+        f"Erwartungswert      {r.expectancy}",
+        f"Planabweichungen    {r.deviations}",
         "",
     ]
 
     if not r.sufficient:
         lines.append(
-            f"NOT ENOUGH DATA. {r.closed} of {MIN_TRADES_FOR_A_VERDICT} trades. "
-            "Whatever these numbers show is within the range of chance. Do not "
-            "change the rule on the strength of them — that is how a rule becomes "
-            "a random walk."
+            f"ZU WENIG DATEN. {r.closed} von {MIN_TRADES_FOR_A_VERDICT} Trades. "
+            "Was diese Zahlen zeigen, liegt im Bereich des Zufalls. Ändere die "
+            "Regel nicht deswegen — genau so wird aus einer Regel ein Zufallslauf."
         )
         return "\n".join(lines)
 
     expectancy = r.expectancy or ZERO
     if expectancy > ZERO:
         lines.append(
-            "Expectancy is positive over a usable sample. That is evidence, not "
-            "proof: keep the rule unchanged and keep recording. The next thirty "
-            "trades are the actual test."
+            "Erwartungswert positiv über eine brauchbare Stichprobe. Das ist ein "
+            "Hinweis, kein Beweis: Regel unverändert lassen und weiter aufzeichnen. "
+            "Die nächsten dreissig Trades sind der eigentliche Test."
         )
     else:
         lines.append(
-            "Expectancy is negative. On this evidence the rule costs money. The "
-            "honest options are to stop, or to go back to research with a "
-            "different idea — not to adjust the parameters until the past looks "
-            "better."
+            "Erwartungswert negativ. Nach dieser Datenlage kostet die Regel Geld. "
+            "Die ehrlichen Optionen sind aufhören oder mit einer anderen Idee "
+            "zurück in die Forschung — nicht die Parameter drehen, bis die "
+            "Vergangenheit besser aussieht."
         )
 
     if r.deviations:
         share = (Decimal(r.deviations) / Decimal(r.closed)).quantize(Decimal("0.01"))
         lines.append(
-            f"\n{r.deviations} of {r.closed} exits ({share}) departed from the plan. "
-            "Compare those against the ones that followed it: if the deviations are "
-            "worse, the discipline is the edge. If they are better, the rule is wrong "
-            "and should be rewritten deliberately rather than overridden in the moment."
+            f"\n{r.deviations} von {r.closed} Ausstiegen ({share}) wichen vom Plan ab. "
+            "Vergleiche sie mit denen, die ihm folgten: Sind die Abweichungen "
+            "schlechter, ist die Disziplin dein Edge. Sind sie besser, ist die Regel "
+            "falsch und gehört bewusst neu geschrieben — nicht im Moment übergangen."
         )
     return "\n".join(lines)
 

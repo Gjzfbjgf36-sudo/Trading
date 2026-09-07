@@ -48,8 +48,9 @@ Es prüft ein Signal aus einer Regel, die du selbst geschrieben und backgetestet
 hast, sagt dir ob und wie groß — und hält fest, was du vorher behauptet hast.
 
 ```bash
-python -m arbcore.app.run_gate check --symbol BTCUSD --side BUY \
-    --entry 60000 --stop 57000 --equity 1000 --source donchian_55_20
+cp config/decide.example.yaml config/decide.yaml   # einmalig, eigene Zahlen eintragen
+python -m arbcore.app.run_gate wizard              # geführt: prüfen und Plan festhalten
+python -m arbcore.app.run_gate serve --token ...   # optional: TradingView-Webhook
 ```
 
 Anleitung ohne Vorkenntnisse: **[docs/ANLEITUNG.md](docs/ANLEITUNG.md)**.
@@ -103,12 +104,14 @@ favourable probabilities; an unmonitored condition is not a healthy one.
 | Pre-commitment journal | `src/arbcore/decide/journal.py` | Thesis and invalidation before entry; plans cannot be rewritten |
 | Signal gate | `src/arbcore/decide/gate.py` | Green or no, with the specific check that blocked it. No order path |
 | Decision review | `src/arbcore/review/performance.py` | No verdict below 30 trades; measures what deviating costs you |
+| Account ledger | `src/arbcore/decide/account.py` | Equity, peak and daily loss derived from the journal, never typed |
+| Webhook receiver | `src/arbcore/decide/webhook.py` | TradingView alerts; queues verdicts, never files a plan for you |
 
 ## Quick start
 
 ```bash
 make install
-make check      # ruff + mypy --strict + pytest (346 tests)
+make check      # ruff + mypy --strict + pytest (387 tests)
 
 # The honest scenario: retail fees, calm spreads
 python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario realistic

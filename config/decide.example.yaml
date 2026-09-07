@@ -1,0 +1,35 @@
+# Entscheidungssystem — deine Einstellungen.
+# Kopiere diese Datei nach config/decide.yaml und trage deine Zahlen ein.
+# config/decide.yaml ist git-ignoriert.
+
+# Startkapital. In der Paper-Phase ein gedachter Betrag — nimm den, mit dem du
+# später wirklich anfangen würdest, sonst üben die Positionsgrößen etwas
+# anderes, als du später tust.
+starting_capital: "1000"
+
+# Gebührensatz deiner Börse als BRUCHTEIL. 0,26 % sind 0.0026, nicht 0.26.
+# Nachschlagen, nicht schätzen — diese Zahl entscheidet mit, ob ein Setup
+# überhaupt handelbar ist.
+fee_rate: "0.0026"
+
+# Kleinster Auftrag, den die Börse annimmt, in Quote-Währung.
+min_notional: "10"
+
+symbol: "BTCUSD"
+
+# --- Risiko (Standardwerte sind bewusst konservativ) ---
+# Anteil des Kapitals, den ein einzelner Trade riskieren darf.
+risk_per_trade: "0.01"
+# Tagesverlust, ab dem keine neuen Trades mehr erlaubt sind.
+daily_loss_limit: "0.03"
+# Drawdown vom Höchststand, ab dem alles anhält.
+max_drawdown: "0.15"
+# Obergrenze für eine Position, unabhängig vom Stop-Abstand.
+max_position_fraction: "0.25"
+
+max_open_positions: 3
+
+# Auf true erst, wenn ALLE vier Bedingungen aus docs/ANLEITUNG.md erfüllt sind.
+# Der Wert ändert keine einzige Prüfung — er wird nur im Journal festgehalten,
+# damit Papier- und Echtgeld-Ergebnisse nie vermischt werden.
+real_money: false

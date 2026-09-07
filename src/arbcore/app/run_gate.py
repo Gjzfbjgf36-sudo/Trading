@@ -1,54 +1,48 @@
-"""CLI: check a signal against your risk limits, and record the plan.
+"""CLI für das Entscheidungssystem. Es platziert keine Orders.
 
-Nothing here places an order. It answers "may this proceed, at what size" and
-writes down what you committed to, so that in three months your own hit rate is
-a number rather than a feeling.
-
-    # Is this trade allowed, and how big?
-    python -m arbcore.app.run_gate check \\
-        --symbol BTCUSD --side BUY --entry 60000 --stop 57000 \\
-        --equity 1000 --source donchian_55_20
-
-    # Record the plan (only possible for a green verdict)
-    python -m arbcore.app.run_gate commit \\
-        --symbol BTCUSD --side BUY --entry 60000 --stop 57000 \\
-        --equity 1000 --source donchian_55_20 \\
-        --thesis "..." --invalidation "..."
-
-    # Close it out
-    python -m arbcore.app.run_gate close --ref BTCUSD-123 --exit 62000 --reason TARGET_HIT
-
-    # What do my own decisions say?
+    python -m arbcore.app.run_gate status
+    python -m arbcore.app.run_gate check   --entry 60000 --stop 57000 --source donchian_55_20
+    python -m arbcore.app.run_gate wizard
+    python -m arbcore.app.run_gate close   --ref BTCUSD-123 --exit 62000 --reason TARGET_HIT
     python -m arbcore.app.run_gate review
+    python -m arbcore.app.run_gate serve   --token <geheim>
+
+Kapital, Höchststand und Tagesverlust werden aus dem Journal abgeleitet, nicht
+eingetippt: ein Tippfehler an dieser Stelle würde die Positionsgröße
+verfälschen, ohne dass es auffällt.
 """
 
 from __future__ import annotations
 
 import argparse
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
-from ..decide.gate import AccountState, GateConfig, Signal, SignalGate
-from ..decide.journal import ExitReason, Journal
-from ..decide.sizing import RiskProfile
+from ..decide.account import AccountLedger
+from ..decide.gate import GateConfig, Signal, SignalGate
+from ..decide.journal import ExitReason, Journal, PlanIncomplete
+from ..decide.settings import DEFAULT_PATH, DecideSettings, SettingsError, load_settings
+from ..decide.webhook import SignalQueue, make_server
 from ..domain.types import Side
-from ..review.performance import review_journal
-
-DEFAULT_JOURNAL = "journal/decisions.sqlite"
+from ..review.performance import deviation_comparison, review_journal
 
 
-def _profile(args: argparse.Namespace) -> RiskProfile:
-    return RiskProfile(
-        risk_per_trade=Decimal(args.risk_per_trade),
-        daily_loss_limit=Decimal(args.daily_loss),
-        max_drawdown=Decimal(args.max_drawdown),
+def _gate(settings: DecideSettings) -> SignalGate:
+    return SignalGate(
+        GateConfig(
+            risk=settings.risk,
+            fee_rate=settings.fee_rate,
+            min_notional=settings.min_notional,
+            max_open_positions=settings.max_open_positions,
+        )
     )
 
 
-def _signal(args: argparse.Namespace, now: datetime) -> Signal:
+def _signal(args: argparse.Namespace, settings: DecideSettings, now: datetime) -> Signal:
+    symbol = args.symbol or settings.symbol
     return Signal(
-        ref=args.ref or f"{args.symbol}-{int(now.timestamp())}",
-        symbol=args.symbol,
+        ref=args.ref or f"{symbol}-{int(now.timestamp())}",
+        symbol=symbol,
         side=Side(args.side),
         entry=Decimal(args.entry),
         stop=Decimal(args.stop),
@@ -58,112 +52,222 @@ def _signal(args: argparse.Namespace, now: datetime) -> Signal:
     )
 
 
-def _account(args: argparse.Namespace) -> AccountState:
-    equity = Decimal(args.equity)
-    return AccountState(
-        equity=equity,
-        peak_equity=Decimal(args.peak_equity) if args.peak_equity else equity,
-        pnl_today=Decimal(args.pnl_today),
-        open_positions=args.open_positions,
-        paper=not args.real,
-    )
-
-
-def _add_trade_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--symbol", required=True)
-    parser.add_argument("--side", choices=["BUY", "SELL"], default="BUY")
+def _add_signal_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--entry", required=True)
     parser.add_argument("--stop", required=True)
     parser.add_argument("--target", default=None)
-    parser.add_argument("--source", required=True, help="which rule produced this signal")
+    parser.add_argument("--source", required=True, help="welche Regel hat das Signal erzeugt")
+    parser.add_argument("--symbol", default=None)
+    parser.add_argument("--side", choices=["BUY", "SELL"], default="BUY")
     parser.add_argument("--ref", default=None)
-    parser.add_argument("--equity", required=True)
-    parser.add_argument("--peak-equity", dest="peak_equity", default=None)
-    parser.add_argument("--pnl-today", dest="pnl_today", default="0")
-    parser.add_argument("--open-positions", dest="open_positions", type=int, default=0)
-    parser.add_argument("--fee-rate", dest="fee_rate", default="0.0026")
-    parser.add_argument("--risk-per-trade", dest="risk_per_trade", default="0.01")
-    parser.add_argument("--daily-loss", dest="daily_loss", default="0.03")
-    parser.add_argument("--max-drawdown", dest="max_drawdown", default="0.15")
-    parser.add_argument(
-        "--real",
-        action="store_true",
-        help="mark this as a real-money trade in the journal (default: paper)",
+
+
+def _ask(prompt: str, *, allow_empty: bool = False) -> str:
+    while True:
+        answer = input(f"{prompt}\n> ").strip()
+        if answer or allow_empty:
+            return answer
+        print("Bitte etwas eingeben.")
+
+
+def _ask_decimal(prompt: str) -> Decimal:
+    while True:
+        try:
+            return Decimal(_ask(prompt))
+        except InvalidOperation:
+            print("Das war keine Zahl. Beispiel: 60000 oder 59750.25")
+
+
+def wizard(settings: DecideSettings, journal: Journal, now: datetime) -> int:
+    """Geführter Ablauf für ein einzelnes Signal."""
+    ledger = AccountLedger(journal, settings)
+    print(ledger.summary(today=now.date()))
+    print()
+    print("Ein Signal prüfen. Abbrechen jederzeit mit Strg+C.\n")
+
+    symbol = _ask(f"Symbol [{settings.symbol}]:", allow_empty=True) or settings.symbol
+    side = "SELL" if _ask("Long oder Short? [long/short]:").lower().startswith("s") else "BUY"
+    entry = _ask_decimal("Einstiegskurs:")
+    stop = _ask_decimal(
+        "Stop-Kurs — hier gibst du zu, dass du falsch lagst.\n"
+        "Er kommt aus deiner Regel, nicht aus dem Bauch:"
     )
+    target_raw = _ask("Zielkurs (leer lassen, wenn die Regel keins vorgibt):", allow_empty=True)
+    source = _ask("Welche Regel hat das ausgelöst? (z. B. donchian_55_20):")
+
+    signal = Signal(
+        ref=f"{symbol}-{int(now.timestamp())}",
+        symbol=symbol,
+        side=Side(side),
+        entry=entry,
+        stop=stop,
+        target=Decimal(target_raw) if target_raw else None,
+        source=source,
+        emitted_at=now,
+    )
+    verdict = _gate(settings).evaluate(signal, ledger.state(today=now.date()), now=now)
+    print("\n" + verdict.explain() + "\n")
+    if not verdict.green:
+        return 1
+
+    print("Jetzt der Teil, der später zählt.\n")
+    thesis = _ask(
+        "Warum erwartest du, dass das funktioniert? Ein Satz.\n"
+        "In drei Monaten liest du das wieder — 'sieht gut aus' hilft dir dann nicht:"
+    )
+    invalidation = _ask(
+        "Was wäre der Beweis, dass du falsch liegst? Etwas Beobachtbares,\n"
+        "kein Gefühl (z. B. 'Schlusskurs unter dem 20-Tage-Tief'):"
+    )
+    try:
+        journal.commit_plan(verdict.to_commitment(thesis, invalidation), now=now)
+    except PlanIncomplete as exc:
+        print(f"\nNicht gespeichert: {exc}")
+        return 1
+    print(f"\nPlan gespeichert als {signal.ref}. Ab jetzt nicht mehr änderbar.")
+    print(f"Stop bei {signal.stop} sofort setzen.")
+    return 0
+
+
+def serve(settings: DecideSettings, journal: Journal, args: argparse.Namespace) -> int:
+    queue = SignalQueue(args.queue)
+    ledger = AccountLedger(journal, settings)
+    server = make_server(
+        gate=_gate(settings),
+        queue=queue,
+        account_provider=lambda: ledger.state(today=datetime.now(UTC).date()),
+        token=args.token,
+        host=args.host,
+        port=args.port,
+    )
+    print(f"Webhook lauscht auf http://{args.host}:{args.port}/tradingview")
+    print("TradingView muss den Header X-Arbcore-Token mitschicken.")
+    print("Signale werden geprüft und in die Warteschlange gelegt — nie automatisch")
+    print("als Plan gespeichert. Beenden mit Strg+C.")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nBeendet.")
+    finally:
+        server.server_close()
+        queue.close()
+    return 0
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Decision gate — no orders are placed")
-    parser.add_argument("--journal", default=DEFAULT_JOURNAL)
+    parser = argparse.ArgumentParser(
+        description="Entscheidungssystem — es platziert keine Orders"
+    )
+    parser.add_argument("--config", default=DEFAULT_PATH)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    check = sub.add_parser("check", help="may this trade proceed, and how big?")
-    _add_trade_args(check)
+    sub.add_parser("status", help="Kontostand, Drawdown, offene Positionen")
+    check = sub.add_parser("check", help="Darf dieser Trade laufen, und wie groß?")
+    _add_signal_args(check)
+    commit = sub.add_parser("commit", help="Plan für ein grünes Signal festhalten")
+    _add_signal_args(commit)
+    commit.add_argument("--thesis", required=True)
+    commit.add_argument("--invalidation", required=True)
+    sub.add_parser("wizard", help="Geführt: prüfen und Plan festhalten")
 
-    commit = sub.add_parser("commit", help="record the plan for a green signal")
-    _add_trade_args(commit)
-    commit.add_argument("--thesis", required=True, help="why you expect this to work")
-    commit.add_argument(
-        "--invalidation", required=True, help="what observable would prove it wrong"
-    )
-
-    close = sub.add_parser("close", help="record the outcome")
+    close = sub.add_parser("close", help="Ergebnis festhalten")
     close.add_argument("--ref", required=True)
     close.add_argument("--exit", dest="exit_price", required=True)
     close.add_argument(
         "--reason", choices=[str(r) for r in ExitReason], default=str(ExitReason.STOP_HIT)
     )
-    close.add_argument("--fee-rate", dest="fee_rate", default="0.0026")
 
-    sub.add_parser("open", help="list open positions")
-    sub.add_parser("review", help="what your own decisions say so far")
+    sub.add_parser("open", help="offene Positionen")
+    sub.add_parser("review", help="was deine eigenen Entscheidungen zeigen")
+    pending = sub.add_parser("pending", help="empfangene Webhook-Signale")
+    pending.add_argument("--queue", default="journal/signals.sqlite")
+    pending.add_argument("--green-only", action="store_true")
+
+    server = sub.add_parser("serve", help="TradingView-Webhook empfangen")
+    server.add_argument("--token", required=True, help="mindestens 24 zufällige Zeichen")
+    server.add_argument("--host", default="127.0.0.1")
+    server.add_argument("--port", type=int, default=8787)
+    server.add_argument("--queue", default="journal/signals.sqlite")
 
     args = parser.parse_args()
     now = datetime.now(UTC)
 
-    if args.command in ("check", "commit"):
-        gate = SignalGate(
-            GateConfig(risk=_profile(args), fee_rate=Decimal(args.fee_rate))
-        )
-        signal = _signal(args, now)
-        verdict = gate.evaluate(signal, _account(args), now=now)
-        print(verdict.explain())
-        if args.command == "check":
-            return 0 if verdict.green else 1
-        if not verdict.green:
-            print("\nNothing recorded: the gate said no.")
-            return 1
-        journal = Journal(args.journal)
-        journal.commit_plan(
-            verdict.to_commitment(args.thesis, args.invalidation), now=now
-        )
-        journal.close()
-        print(f"\nPlan recorded as {signal.ref}. It cannot be edited from here on.")
+    try:
+        settings = load_settings(args.config)
+    except SettingsError as exc:
+        print(f"Konfiguration: {exc}")
+        return 2
+
+    if args.command == "pending":
+        queue = SignalQueue(args.queue)
+        rows = queue.pending(green_only=args.green_only)
+        if not rows:
+            print("Keine offenen Signale.")
+        for row in rows:
+            print(f"[{row['verdict']}] {row['ref']}  {row['symbol']} {row['side']}  "
+                  f"entry {row['entry']}  stop {row['stop']}  ({row['source']})")
+        queue.close()
         return 0
 
-    journal = Journal(args.journal)
+    journal = Journal(settings.journal_path)
+    ledger = AccountLedger(journal, settings)
     try:
+        if args.command == "status":
+            print(ledger.summary(today=now.date()))
+            return 0
+        if args.command == "wizard":
+            return wizard(settings, journal, now)
+        if args.command == "serve":
+            return serve(settings, journal, args)
+
+        if args.command in ("check", "commit"):
+            signal = _signal(args, settings, now)
+            verdict = _gate(settings).evaluate(
+                signal, ledger.state(today=now.date()), now=now
+            )
+            print(verdict.explain())
+            if args.command == "check":
+                return 0 if verdict.green else 1
+            if not verdict.green:
+                print("\nNichts gespeichert: das Gate sagt nein.")
+                return 1
+            journal.commit_plan(
+                verdict.to_commitment(args.thesis, args.invalidation), now=now
+            )
+            print(f"\nPlan gespeichert als {signal.ref}. Ab jetzt nicht mehr änderbar.")
+            return 0
+
         if args.command == "close":
             outcome = journal.record_outcome(
                 args.ref,
                 exit_price=Decimal(args.exit_price),
                 exit_reason=ExitReason(args.reason),
                 now=now,
-                fee_rate=Decimal(args.fee_rate),
+                fee_rate=settings.fee_rate,
             )
-            print(f"Closed {args.ref}: P/L {outcome.pnl} ({outcome.exit_reason})")
+            print(f"Geschlossen {args.ref}: P/L {outcome.pnl} ({outcome.exit_reason})")
             if not outcome.followed_plan:
-                print("Recorded as a deviation from the plan.")
-        elif args.command == "open":
+                print("Als Abweichung vom Plan vermerkt.")
+            print()
+            print(ledger.summary(today=now.date()))
+            return 0
+
+        if args.command == "open":
             rows = journal.open_positions()
             if not rows:
-                print("No open positions.")
+                print("Keine offenen Positionen.")
             for row in rows:
                 print(f"{row['ref']}  {row['symbol']} {row['side']}  "
-                      f"entry {row['entry']}  stop {row['stop']}  qty {row['quantity']}")
-                print(f"    thesis: {row['thesis']}")
-        elif args.command == "review":
+                      f"Einstieg {row['entry']}  Stop {row['stop']}  Menge {row['quantity']}")
+                print(f"    These: {row['thesis']}")
+            return 0
+
+        if args.command == "review":
             print(review_journal(journal))
+            comparison = deviation_comparison(journal)
+            print(f"\nPlan befolgt:    {comparison['followed_plan']}")
+            print(f"Abgewichen:      {comparison['discretionary']}")
+            return 0
     finally:
         journal.close()
     return 0

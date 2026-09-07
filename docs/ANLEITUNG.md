@@ -17,6 +17,26 @@ Du brauchst **kein Börsenkonto**. Nur:
 - einen TradingView-Account (kostenloser Tarif genügt)
 - dieses Repository
 
+### Einmalig einrichten
+
+```bash
+cp config/decide.example.yaml config/decide.yaml
+```
+
+Dann `config/decide.yaml` öffnen und drei Zahlen eintragen: dein gedachtes
+Startkapital, den Gebührensatz deiner Börse **als Bruchteil** (0,26 % sind
+`0.0026`, nicht `0.26`) und den Mindestauftrag.
+
+Danach nie wieder eintippen — Kapital, Höchststand und Tagesverlust werden ab
+jetzt aus dem Journal abgeleitet. Das ist Absicht: Ein Tippfehler bei der
+Kontogröße würde die Positionsgröße verfälschen, ohne dass es jemandem auffällt.
+
+Prüfen mit:
+
+```bash
+python -m arbcore.app.run_gate status
+```
+
 Dauer: mindestens 3 Monate oder 30 abgeschlossene Trades — je nachdem, was
 länger dauert. Vorher sagen die Zahlen nichts.
 
@@ -53,31 +73,34 @@ die du testest.** Wenn es mehr als drei bis vier werden, glaub dem Ergebnis nich
 
 ## Schritt 2 — Signal prüfen lassen
 
-Wenn die Regel ein Signal gibt, fragst du das Gate:
+Am einfachsten geführt — das System fragt dich der Reihe nach alles ab:
+
+```bash
+python -m arbcore.app.run_gate wizard
+```
+
+Oder direkt, wenn du die Zahlen schon hast:
 
 ```bash
 python -m arbcore.app.run_gate check \
-    --symbol BTCUSD --side BUY \
-    --entry 60000 --stop 57000 \
-    --equity 1000 \
-    --source donchian_55_20
+    --entry 60000 --stop 57000 --source donchian_55_20
 ```
 
 Antwort entweder:
 
 ```
-GREEN  BTCUSD  BUY
-  size          0.00302645  (~181.59)
-  stop          57000   <- sofort setzen
-  risking       10.00
+GRÜN  BTCUSD  BUY
+  Menge          0.00302645  (~181.59)
+  Stop           57000   <- sofort setzen
+  Risiko         10.00
 ```
 
 oder:
 
 ```
-NO  BTCUSD  BUY
-  blocked by fee_share_of_risk [NEGATIVE_NET_PROFIT] — most of what you would
-  lose at the stop is fees, not the market.
+NEIN  BTCUSD  BUY
+  blockiert durch fee_share_of_risk [NEGATIVE_NET_PROFIT] — der grösste Teil
+  deines Stop-Verlusts wären Gebühren, nicht der Markt.
 ```
 
 **Jedes Nein nennt die konkrete Prüfung.** Es gibt kein „irgendwie ungünstig".
@@ -98,10 +121,11 @@ NO  BTCUSD  BUY
 
 ## Schritt 3 — Plan festhalten (vor dem Einstieg)
 
+Der `wizard` macht das direkt im Anschluss. Manuell geht es so:
+
 ```bash
 python -m arbcore.app.run_gate commit \
-    --symbol BTCUSD --side BUY --entry 60000 --stop 57000 \
-    --equity 1000 --source donchian_55_20 \
+    --entry 60000 --stop 57000 --source donchian_55_20 \
     --thesis "Ausbruch über das 55-Tage-Hoch, Trend seit Oktober intakt" \
     --invalidation "Schlusskurs unter dem 20-Tage-Tief beendet die These"
 ```
@@ -147,6 +171,50 @@ Ab 30 Trades sagt dir die Auswertung eines von zwei Dingen:
 - **Erwartungswert negativ** → Die Regel kostet Geld. Ehrliche Optionen:
   aufhören, oder mit einer anderen Idee zurück in die Forschung. **Nicht** die
   Parameter drehen, bis die Vergangenheit besser aussieht.
+
+---
+
+---
+
+## Optional: TradingView automatisch anbinden
+
+Statt Signale von Hand einzutippen, kann TradingView sie schicken. Wichtig:
+Das System **legt daraus nie selbst einen Plan an**. Es prüft und legt das
+Ergebnis in eine Warteschlange — entscheiden und die These schreiben musst du.
+
+**1. Token erzeugen** (mindestens 24 zufällige Zeichen):
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+**2. Empfänger starten:**
+
+```bash
+python -m arbcore.app.run_gate serve --token DEIN_TOKEN
+```
+
+**3. Token ins Pine-Script eintragen.** In den Einstellungen der Strategie das
+Feld „Webhook token" auf denselben Wert setzen.
+
+> TradingView kann keine eigenen HTTP-Header senden, deshalb reist der Token im
+> Nachrichtentext mit. Damit steht er in deinem Alert: behandle das Script von
+> da an als Geheimnis und tausche den Token aus, wenn du es je weitergibst.
+
+**4. Alert anlegen.** Bedingung: die Strategie. In „Webhook URL" deine Adresse
+eintragen, ins Nachrichtenfeld `{{strategy.order.alert_message}}`.
+
+**5. Empfangene Signale ansehen:**
+
+```bash
+python -m arbcore.app.run_gate pending
+```
+
+> Der Empfänger lauscht standardmäßig nur lokal (`127.0.0.1`). Damit
+> TradingView ihn erreicht, brauchst du eine öffentliche Adresse **mit TLS**
+> (z. B. über einen Reverse Proxy). Ohne Verschlüsselung ginge der Token im
+> Klartext über die Leitung. Und: eine öffentlich erreichbare Adresse sind
+> wieder laufende Kosten, die dein Edge tragen muss.
 
 ---
 

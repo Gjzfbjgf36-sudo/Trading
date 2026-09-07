@@ -148,9 +148,9 @@ def size_position(
             risk_amount=risk_amount,
             stop_distance=loss_per_unit,
             binding_constraint=(
-                f"position of {notional} is below the {min_notional} minimum; "
-                f"at {equity} equity and a {price_distance} stop, a correctly "
-                f"sized trade is too small to place"
+                f"Position von {notional} liegt unter dem Mindestauftrag "
+                f"{min_notional}; bei {equity} Kapital und {price_distance} "
+                f"Stop-Abstand ist ein korrekt dimensionierter Trade zu klein"
             ),
         )
 

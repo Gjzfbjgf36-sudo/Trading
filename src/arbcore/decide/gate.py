@@ -116,22 +116,22 @@ class GateVerdict:
         if self.green:
             assert self.size is not None
             lines = [
-                f"GREEN  {self.signal.symbol}  {self.signal.side}",
-                f"  size          {self.size.quantity}  (~{self.size.notional})",
-                f"  entry         {self.signal.entry}",
-                f"  stop          {self.signal.stop}   <- place this immediately",
-                f"  risking       {self.size.risk_amount}",
-                f"  limited by    {self.size.binding_constraint}",
-                f"  rule          {self.signal.source}",
+                f"GRÜN  {self.signal.symbol}  {self.signal.side}",
+                f"  Menge          {self.size.quantity}  (~{self.size.notional})",
+                f"  Einstieg       {self.signal.entry}",
+                f"  Stop           {self.signal.stop}   <- sofort setzen",
+                f"  Risiko         {self.size.risk_amount}",
+                f"  begrenzt durch {self.size.binding_constraint}",
+                f"  Regel          {self.signal.source}",
                 "",
-                "Before entering, write the thesis and the invalidation into the",
-                "journal. The gate has checked the arithmetic, not the idea.",
+                "Vor dem Einstieg These und Invalidierung ins Journal schreiben.",
+                "Das Gate hat die Rechnung geprüft, nicht die Idee.",
             ]
             return "\n".join(lines)
-        lines = [f"NO  {self.signal.symbol}  {self.signal.side}", ""]
+        lines = [f"NEIN  {self.signal.symbol}  {self.signal.side}", ""]
         for check in self.decision.failures:
             detail = f" — {check.detail}" if check.detail else ""
-            lines.append(f"  blocked by {check.name} [{check.reason}]{detail}")
+            lines.append(f"  blockiert durch {check.name} [{check.reason}]{detail}")
         return "\n".join(lines)
 
     def to_commitment(self, thesis: str, invalidation: str) -> Commitment:
@@ -176,7 +176,7 @@ class SignalGate:
                 CheckResult.fail(
                     "signal_time",
                     RejectReason.CLOCK_DRIFT,
-                    detail=f"signal is timestamped {abs(age)} in the future",
+                    detail=f"Signal ist auf {abs(age)} in der Zukunft datiert",
                 )
             )
         elif age > cfg.max_signal_age:
@@ -184,7 +184,7 @@ class SignalGate:
                 CheckResult.fail(
                     "signal_age",
                     RejectReason.QUOTE_EXPIRED,
-                    detail=f"signal is {age} old; the market has moved since",
+                    detail=f"Signal ist {age} alt; der Markt ist seitdem weitergelaufen",
                 )
             )
         else:
@@ -200,8 +200,8 @@ class SignalGate:
                     observed=drawdown,
                     limit=cfg.risk.max_drawdown,
                     detail=(
-                        "stop trading and review. This limit exists so that a bad "
-                        "run ends while the account still exists"
+                        "aufhören und prüfen. Diese Grenze sorgt dafür, dass eine "
+                        "schlechte Serie endet, solange das Konto noch existiert"
                     ),
                 )
             )
@@ -217,7 +217,7 @@ class SignalGate:
                     RejectReason.DAILY_LOSS_LIMIT_REACHED,
                     observed=loss_today,
                     limit=daily_limit,
-                    detail="done for today. Trading after this point is where revenge starts",
+                    detail="Feierabend für heute. Ab hier fängt Revenge-Trading an",
                 )
             )
         else:
@@ -281,9 +281,9 @@ class SignalGate:
                         observed=share,
                         limit=MAX_FEE_SHARE_OF_RISK,
                         detail=(
-                            "most of what you would lose at the stop is fees, not the "
-                            "market. Use a wider stop or a bigger account, or do not "
-                            "trade this setup"
+                            "der grösste Teil deines Stop-Verlusts wären Gebühren, "
+                            "nicht der Markt. Weiterer Stop, grösseres Konto — oder "
+                            "dieses Setup nicht handeln"
                         ),
                     )
                 )
@@ -303,8 +303,9 @@ class SignalGate:
                             observed=ratio,
                             limit=Decimal(1),
                             detail=(
-                                "risking more than the target pays. This needs a win "
-                                "rate above 50% to break even, which few rules have"
+                                "du riskierst mehr, als das Ziel einbringt. Das "
+                                "braucht über 50 % Trefferquote, um überhaupt "
+                                "auf null zu kommen"
                             ),
                         )
                     )

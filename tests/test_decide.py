@@ -101,7 +101,7 @@ def test_a_small_account_is_told_it_cannot_trade_rather_than_squeezed_in():
         profile=RiskProfile(),
     )
     assert not size.viable
-    assert "below the" in size.binding_constraint
+    assert "Mindestauftrag" in size.binding_constraint
 
 
 def test_risk_above_two_percent_is_refused_outright():
@@ -232,8 +232,8 @@ def test_a_small_sample_gets_no_verdict(journal):
             f"T-{i}", exit_price=Decimal("62000"), exit_reason=ExitReason.TARGET_HIT, now=NOW
         )
     text = review_journal(journal)
-    assert "NOT ENOUGH DATA" in text
-    assert "within the range of chance" in text
+    assert "ZU WENIG DATEN" in text
+    assert "Bereich des Zufalls" in text
 
 
 def test_a_usable_sample_of_losses_says_stop(journal):
@@ -243,12 +243,12 @@ def test_a_usable_sample_of_losses_says_stop(journal):
             f"L-{i}", exit_price=Decimal("57000"), exit_reason=ExitReason.STOP_HIT, now=NOW
         )
     text = review_journal(journal)
-    assert "Expectancy is negative" in text
-    assert "not to adjust the parameters" in text
+    assert "Erwartungswert negativ" in text
+    assert "nicht die Parameter drehen" in text
 
 
 def test_an_empty_journal_says_so(journal):
-    assert "No closed trades yet" in review_journal(journal)
+    assert "Noch keine abgeschlossenen Trades" in review_journal(journal)
 
 
 # --- gate ----------------------------------------------------------------
@@ -287,7 +287,7 @@ def test_a_sound_signal_goes_green():
     verdict = gate().evaluate(a_signal(), an_account(), now=NOW)
     assert verdict.green, verdict.explain()
     assert verdict.size is not None and verdict.size.viable
-    assert "GREEN" in verdict.explain()
+    assert "GRÜN" in verdict.explain()
 
 
 def test_the_gate_never_produces_a_view_of_its_own():
@@ -352,7 +352,7 @@ def test_a_target_worth_less_than_the_risk_is_refused():
 def test_a_tiny_account_is_refused_with_a_reason():
     verdict = gate().evaluate(a_signal(), an_account(equity=Decimal("50")), now=NOW)
     assert not verdict.green
-    assert "below the" in verdict.explain()
+    assert "Mindestauftrag" in verdict.explain()
 
 
 def test_every_rejection_names_the_check_that_caused_it():

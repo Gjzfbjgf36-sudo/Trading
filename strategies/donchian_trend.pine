@@ -67,12 +67,20 @@ if exit_signal and strategy.position_size > 0
     strategy.close("long", comment = "exit breakdown")
 
 // --- webhook payload ------------------------------------------------------
-// Create an alert on this strategy and paste {{strategy.order.alert_message}}
-// into the message box. The gate parses this JSON; it decides nothing itself.
-// `ref` makes a redelivered alert recognisable as a duplicate.
+// The gate parses this JSON. It decides nothing itself; `ref` makes a
+// redelivered alert recognisable as a duplicate rather than a second signal.
+//
+// TradingView alerts cannot send custom HTTP headers, so the shared token has
+// to travel inside the body. Put your own token here before creating the
+// alert, and treat this script as secret once you have: anyone with the token
+// can post signals to your endpoint.
+webhook_token = input.string("CHANGE-ME-32-random-characters", "Webhook token",
+     confirm = true,
+     tooltip = "Must match the --token you pass to `run_gate serve`. At least 24 random characters.")
+
 alert_entry = str.format(
-     '{{"ref":"{0}-{1}","symbol":"{2}","side":"BUY","entry":{3},"stop":{4},"source":"donchian_{5}_{6}"}}',
-     syminfo.ticker, str.tostring(time), syminfo.ticker,
+     '{{"token":"{0}","ref":"{1}-{2}","symbol":"{3}","side":"BUY","entry":{4},"stop":{5},"source":"donchian_{6}_{7}"}}',
+     webhook_token, syminfo.ticker, str.tostring(time), syminfo.ticker,
      str.tostring(close), str.tostring(stop_level),
      str.tostring(entry_len), str.tostring(exit_len))
 
