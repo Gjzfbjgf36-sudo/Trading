@@ -129,6 +129,14 @@ class TradeProposal:
     #: not exist yet. Permitted only in paper mode, only below a hard size cap,
     #: and excluded from performance reporting. See docs/paper-trading.md.
     calibration: bool = False
+    #: Worst-case increase in exposure if this trade goes wrong, when that is
+    #: less than the notional. ``None`` means "assume the full notional", which
+    #: is the conservative default and what every non-atomic strategy gets
+    #: regardless of what it declares. An atomic round trip that reverts leaves
+    #: the position untouched, so its worst-case delta is genuinely near zero —
+    #: counting the notional again on top of capital we already hold would
+    #: double-count it and block correctly-sized trades.
+    exposure_delta: Decimal | None = None
     created_at: datetime | None = None
 
     def __post_init__(self) -> None:
@@ -141,6 +149,11 @@ class TradeProposal:
                 raise ValueError(f"{name} must be within [0, 1] (got {value})")
         if self.notional <= ZERO:
             raise ValueError("notional must be > 0")
+        if self.exposure_delta is not None:
+            delta = to_decimal(self.exposure_delta)
+            object.__setattr__(self, "exposure_delta", delta)
+            if delta < ZERO:
+                raise ValueError("exposure_delta must be >= 0")
         if not self.assets or not self.venues:
             raise ValueError("a proposal must reference at least one asset and one venue")
         for name in ("quote_age_ms", "expected_execution_latency_ms"):
@@ -152,6 +165,17 @@ class TradeProposal:
         # engine compares the magnitude.
         if not isinstance(self.clock_drift_ms, int):
             raise ValueError(f"clock_drift_ms must be an integer (got {self.clock_drift_ms!r})")
+
+    def worst_case_exposure_delta(self) -> Decimal:
+        """Exposure this trade can add, worst case.
+
+        A non-atomic strategy always pays the full notional here whatever it
+        declares: its failure mode is a one-sided position, which is exactly
+        the notional. The declaration is only honoured for atomic execution.
+        """
+        if self.atomicity is Atomicity.NON_ATOMIC or self.exposure_delta is None:
+            return self.notional
+        return min(self.notional, self.exposure_delta)
 
     def net_expected_profit(self) -> Decimal:
         """Gross profit minus every modelled cost. Raises if costs are incomplete."""

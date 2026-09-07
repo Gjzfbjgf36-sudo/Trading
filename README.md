@@ -23,6 +23,24 @@ it traded 132 times for **+26.15** — against an infrastructure cost of
 It contains the numbers, the 14 defects the runs exposed, and the honest
 recommendation (which is: do not pursue this strategy at retail fee tiers).
 
+### DEX/DEX: a different cost structure, and a cliff
+
+Following that recommendation, a second strategy was built with the opposite
+cost shape — gas is **fixed per attempt**, so there is a *minimum* viable size,
+while pool impact imposes a *maximum*.
+
+At L1 gas (30/attempt) the strategy found **one** opportunity in 20,000 ticks.
+At L2 gas it traded 95 times for **+75.50 after infrastructure** — the first
+net-positive configuration in the project.
+
+But the whole result hinges on one unmeasured parameter. At an assumed
+competitor-arbitrage rate of 0.35 it earns +48; at **0.50 it places zero
+trades**. Nobody has measured where the real value lies.
+
+**[DEX_RUN_REPORT.md](docs/DEX_RUN_REPORT.md) §5** explains why that makes the
+positive number a statement about an assumption rather than about the strategy,
+and what read-only measurement would settle it.
+
 ## Operating principle
 
 > **When in doubt → do not trade.**
@@ -58,6 +76,10 @@ favourable probabilities; an unmonitored condition is not a healthy one.
 | Persistence | `src/arbcore/persistence/store.py` | SQLite WAL; append-only decisions and fills |
 | Reconciliation | `src/arbcore/recovery/reconciliation.py` | Detects and halts; never auto-repairs |
 | Metrics & alerts | `src/arbcore/monitoring/` | Never ROI alone; CRITICAL alerts never suppressed |
+| AMM pricing | `src/arbcore/pricing/amm.py` | Exact `x*y=k`; curve impact separated from pool fee |
+| Gas economics | `src/arbcore/costs/gas.py` | Fixed cost per attempt; minimum viable notional |
+| DEX/DEX strategy | `src/arbcore/strategy/dex_dex.py` | Size window, profit-maximising sizing, atomic semantics |
+| Chain execution | `src/arbcore/execution/chain.py` | Simulate-then-send, reverts, dropped txs, idempotency |
 | Walk-forward | `src/arbcore/backtest/walkforward.py` | Enforced, persisted out-of-sample budget |
 | Paper session | `src/arbcore/app/paper_session.py` | Wires all of the above |
 
@@ -65,7 +87,7 @@ favourable probabilities; an unmonitored condition is not a healthy one.
 
 ```bash
 make install
-make check      # ruff + mypy --strict + pytest (253 tests)
+make check      # ruff + mypy --strict + pytest (311 tests)
 
 # The honest scenario: retail fees, calm spreads
 python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario realistic
@@ -75,6 +97,13 @@ python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario mechanic
 
 # Walk-forward; --out-of-sample spends this parameter set's budget, once
 python -m arbcore.app.run_walkforward --scenario mechanics
+
+# DEX/DEX: compare the fixed-cost economics across chains
+python -m arbcore.app.run_paper_dex --chain ethereum --ticks 20000
+python -m arbcore.app.run_paper_dex --chain base --ticks 20000
+
+# Which assumption is the result standing on?
+python -m arbcore.app.run_sensitivity --ticks 12000
 ```
 
 Configuration lives in `config/risk_limits.paper.yaml`; copy `.env.example` to
@@ -96,7 +125,8 @@ development environment, research mode, live trading off.
 | [economic-viability.md](docs/economic-viability.md) | Minimum viable capital, net profit after infrastructure cost |
 | [regulatory.md](docs/regulatory.md) | DE/EU areas flagged for professional review (not advice) |
 | [roadmap.md](docs/roadmap.md) | 18 phases, deployment progression, live gate |
-| [PAPER_RUN_REPORT.md](docs/PAPER_RUN_REPORT.md) | **Results, defects found, and what follows** |
+| [PAPER_RUN_REPORT.md](docs/PAPER_RUN_REPORT.md) | **CEX/CEX results, defects found, and what follows** |
+| [DEX_RUN_REPORT.md](docs/DEX_RUN_REPORT.md) | **DEX/DEX results, and the parameter the answer hangs on** |
 | [paper-trading.md](docs/paper-trading.md) | Calibration mode, the simulated operator, scenarios |
 | [market-data-model.md](docs/market-data-model.md) | Book integrity rules, feeds, clocks, quality scoring |
 | [execution-model.md](docs/execution-model.md) | Executable prices, order state, idempotency, paper fills |

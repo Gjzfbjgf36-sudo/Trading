@@ -59,6 +59,18 @@ that closes them.
 | 42 | Daily limits that never reset become lifetime limits | Technology | M | M | Rejections dominated by a daily limit | UTC day rollover; tested | L | Mitigated | Per change |
 | 43 | Reserving at the decision price under-funds the fill | Execution | H | M | Settlement exceeding reservation | Reserve at the limit price | L | Mitigated | Per change |
 
+### Discovered by DEX/DEX paper trading (see DEX_RUN_REPORT.md)
+
+| # | Risk | Category | Prob | Impact | Detection | Mitigation | Residual | Status | Review |
+|---|---|---|---|---|---|---|---|---|---|
+| 44 | A strategy can be impossible at *every* size: the fixed-cost floor exceeds the price-impact ceiling | Economic | H | M | `size_window` reports the overlap before trading | Computed up front; the session records *why* no size worked | L | Mitigated | Per change |
+| 45 | The DEX result depends on an unmeasured competitor-arbitrage rate. Between 0.35 and 0.50 lies the difference between a working strategy and none | Model | H | H | Sensitivity sweep (`run_sensitivity`) | None available — the parameter must be **measured** on real pools before the result means anything | **H** | **OPEN — blocks any capital decision** | Per change |
+| 46 | Conflating a protocol fee with price impact makes any impact limit below the fee unsatisfiable at every size | Model | M | M | Every opportunity blocked for no visible reason | `curve_impact` and `fee_fraction` are separate quantities | L | Mitigated | Per change |
+| 47 | Sizing at the maximum permitted rather than the profit optimum | Model | H | M | Profitable dislocations priced as losses | Profit-maximising search inside the size window | L | Mitigated | Per change |
+| 48 | A single global latency limit cannot serve both CEX round-trips and on-chain inclusion | Technology | M | M | `LATENCY_EXCEEDED` on every on-chain opportunity | Global limit is the loosest legitimate value; strategies tighten it, and overrides may only tighten | L | Mitigated | Per change |
+| 49 | Blanket "+notional to every exposure dimension" double-counts capital already held in a same-asset round trip | Model | M | M | Correctly-sized trades blocked in two strategies | `exposure_delta`, honoured only for atomic execution | L | Mitigated | Per change |
+| 50 | Gas spikes remove an already-thin on-chain edge entirely | Market | M | H | Injected congestion multiplies attempt cost 4x | Gas is a mandatory cost line; unknown gas rejects | M | Partly mitigated | Weekly |
+
 ## How to use this register
 
 * A row marked **OPEN** is not a to-do that can be waived. The phase named in

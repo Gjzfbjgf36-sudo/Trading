@@ -9,7 +9,7 @@ remaining, known limitations) and **stops for approval**. No phase is skipped.
 | 1 | Architecture and risk model | **Complete** |
 | 2 | Market-data infrastructure: book integrity, sequencing, gap/duplicate/out-of-order detection, heartbeats, reconnect backoff, clock tracking | **Complete** (transport layer pending adapters) |
 | 3 | CEX adapters | **Blocked** — needs current official documentation; interfaces defined, nothing invented |
-| 4 | DEX adapters | **Blocked** — needs verified contract addresses and official docs |
+| 4 | DEX adapters | **Blocked** — needs verified contract addresses and official docs. The *strategy* (AMM pricing, gas economics, atomic execution, MEV) is complete and tested against synthetic pools |
 | 5 | Data validation and data-quality scoring | **Complete** |
 | 6 | Opportunity engine (VWAP-at-size, CEX/CEX) | **Complete** for CEX/CEX |
 | 7 | Profit engine (full cost stack, safety margin, risk-adjusted EV) | **Complete** |

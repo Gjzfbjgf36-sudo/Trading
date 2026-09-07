@@ -374,6 +374,10 @@ class RiskEngine:
         limits = ctx.limits
         exposure = ctx.exposure
         notional = proposal.notional
+        # Trade size is always checked against the full notional: that is the
+        # capital committed, whatever the failure mode. Only the *exposure*
+        # dimensions use the worst-case delta.
+        delta = proposal.worst_case_exposure_delta()
 
         size_limit = limits.max_trade_size
         if proposal.atomicity is Atomicity.NON_ATOMIC:
@@ -385,7 +389,7 @@ class RiskEngine:
             ),
             _threshold(
                 "total_exposure",
-                exposure.total_exposure + notional,
+                exposure.total_exposure + delta,
                 limits.max_total_exposure,
                 RejectReason.TOTAL_EXPOSURE_EXCEEDED,
             ),
@@ -426,7 +430,7 @@ class RiskEngine:
             checks.append(
                 _threshold(
                     f"asset_exposure[{asset}]",
-                    exposure.asset_exposure(asset) + notional,
+                    exposure.asset_exposure(asset) + delta,
                     limits.max_asset_exposure,
                     RejectReason.ASSET_EXPOSURE_EXCEEDED,
                 )
@@ -449,7 +453,7 @@ class RiskEngine:
             checks.append(
                 _threshold(
                     f"chain_exposure[{chain}]",
-                    exposure.chain_exposure(chain) + notional,
+                    exposure.chain_exposure(chain) + delta,
                     limits.max_chain_exposure,
                     RejectReason.CHAIN_EXPOSURE_EXCEEDED,
                 )

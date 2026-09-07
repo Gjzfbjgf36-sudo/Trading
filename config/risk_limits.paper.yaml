@@ -32,7 +32,10 @@ risk_limits:
   max_slippage: "0.0010"
   max_price_impact: "0.0020"
   max_quote_age_ms: 1500
-  max_execution_latency_ms: 2000
+  # Loosest legitimate value across all strategies: on-chain inclusion takes
+  # seconds, not milliseconds. Each strategy TIGHTENS this — CEX/CEX to 2000ms
+  # in code — and StrategyLimits.apply refuses any override that loosens it.
+  max_execution_latency_ms: 30000
   max_clock_drift_ms: 500
 
   # --- economics ---

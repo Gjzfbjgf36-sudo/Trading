@@ -21,12 +21,12 @@ from pathlib import Path
 
 from ..adapters.synthetic import SyntheticConfig, SyntheticMarket
 from ..config.environment import Environment, RuntimeProfile, TradingMode
-from ..config.limits import RiskLimits
+from ..config.limits import RiskLimits, StrategyLimits
 from ..config.whitelist import Whitelist
 from ..costs.fees import FeeBook, FeeUnknown
 from ..domain.decision import CheckResult, Decision, RejectReason, decide
 from ..domain.state import OpportunityLifecycle, OpportunityState
-from ..domain.types import ZERO, AssetId, Side, VenueId, to_decimal
+from ..domain.types import ZERO, AssetId, Side, StrategyKind, VenueId, to_decimal
 from ..execution.order import Order, OrderState, client_order_id
 from ..execution.paper import PaperMarketModel, PaperVenue, limit_price_for
 from ..inventory.manager import InsufficientBalance, InventoryManager
@@ -134,7 +134,14 @@ class PaperSession:
         if len(venues) < 2:
             raise ValueError("a CEX/CEX session needs at least two venues")
         self.config = config
-        self.limits = limits
+        # A CEX order round-trip has no business taking seconds. The global
+        # limit is the loosest across all strategies (on-chain inclusion);
+        # this tightens it back for CEX/CEX. Overrides may only tighten.
+        self.limits = StrategyLimits(
+            strategy=StrategyKind.CEX_CEX,
+            enabled=True,
+            overrides={"max_execution_latency_ms": 2000},
+        ).apply(limits)
         self.whitelist = whitelist
         self.fees = fees
         self.base = base
