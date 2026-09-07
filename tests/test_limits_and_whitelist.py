@@ -151,6 +151,7 @@ def test_risk_limits_reject_zero_sizes():
             max_chain_exposure=Decimal(1),
             max_daily_loss=Decimal(1),
             max_daily_trades=1,
+            max_daily_calibration_trades=1,
             max_concurrent_trades=1,
             max_inventory_imbalance=Decimal(1),
             min_reserve_balance=Decimal(0),

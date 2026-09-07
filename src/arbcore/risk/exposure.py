@@ -57,6 +57,8 @@ class ExposureSnapshot:
     #: Realised + unrealised P/L for the current trading day (negative = loss).
     daily_pnl: Decimal = ZERO
     trades_today: int = 0
+    #: Paper calibration trades placed today, counted separately.
+    calibration_trades_today: int = 0
     concurrent_trades: int = 0
     #: Largest absolute inventory deviation from target, in accounting currency.
     inventory_imbalance: Decimal = ZERO

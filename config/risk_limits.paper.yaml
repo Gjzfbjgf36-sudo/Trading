@@ -18,6 +18,8 @@ risk_limits:
   # --- loss and activity ---
   max_daily_loss: "100"
   max_daily_trades: 50
+  # Paper-only calibration budget; see limits.py for why it is separate.
+  max_daily_calibration_trades: 60
   max_concurrent_trades: 2
 
   # --- inventory ---

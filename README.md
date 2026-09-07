@@ -1,12 +1,27 @@
 # arbcore — multi-market crypto arbitrage research platform
 
-**Status: Phase 1 (architecture and risk model). Research only.**
-No market-data feeds, no exchange adapters, no order placement. Nothing in this
-repository can move money, and live trading is disabled by default behind a
-gate that requires explicit human approval.
+**Status: research and paper trading. No real money, no exchange adapters.**
+The complete pipeline runs end to end against a synthetic market. Nothing in
+this repository can move money, and live trading is disabled by default behind
+a gate that requires explicit human approval.
 
 This is a research and risk-control platform. It is not a promise of profit,
 and arbitrage is not risk-free.
+
+## The result so far
+
+Over ~5 simulated days at retail taker fees, the system detected **55,231**
+gross-positive cross-venue spreads and accepted **zero** of them. Median net
+margin after the full cost stack: **−111 bps**. Median shortfall against the
+safety-adjusted threshold: **173 bps**.
+
+In a deliberately favourable scenario (high-volume fee tier, wide dislocations)
+it traded 132 times for **+26.15** — against an infrastructure cost of
+**41.67**, for a net of **−15.52**.
+
+**Read [PAPER_RUN_REPORT.md](docs/PAPER_RUN_REPORT.md) before anything else.**
+It contains the numbers, the 14 defects the runs exposed, and the honest
+recommendation (which is: do not pursue this strategy at retail fee tiers).
 
 ## Operating principle
 
@@ -31,12 +46,35 @@ favourable probabilities; an unmonitored condition is not a healthy one.
 | Budgets | `src/arbcore/risk/budget.py` | Per-category, per-strategy risk budgets |
 | Safety | `src/arbcore/safety/` | Latching SAFE MODE and circuit breakers; manual exit only |
 | Strategy state | `src/arbcore/strategy/state.py` | `NORMAL / DEGRADED / PAUSED / DISABLED` |
+| Order book | `src/arbcore/marketdata/book.py` | Sequence/gap/duplicate/crossed detection; invalid books are unusable |
+| Feeds & clocks | `src/arbcore/marketdata/{feed,clock}.py` | Heartbeats, saturating backoff, signed median drift |
+| Data quality | `src/arbcore/marketdata/quality.py` | Product of six factors — one zero disqualifies |
+| Executable price | `src/arbcore/pricing/executable.py` | VWAP at *our* size; incomplete fills never hidden |
+| CEX/CEX strategy | `src/arbcore/strategy/cex_cex.py` | Pre-funded inventory, non-atomic, full cost stack |
+| Measured statistics | `src/arbcore/strategy/statistics.py` | The only source of execution probabilities |
+| Inventory | `src/arbcore/inventory/manager.py` | Idempotent reservations, minimum reserve, imbalance |
+| Orders | `src/arbcore/execution/order.py` | Deterministic client ids; a timeout never resends |
+| Paper venue | `src/arbcore/execution/paper.py` | Latency, partials, rejections, **adverse selection** |
+| Persistence | `src/arbcore/persistence/store.py` | SQLite WAL; append-only decisions and fills |
+| Reconciliation | `src/arbcore/recovery/reconciliation.py` | Detects and halts; never auto-repairs |
+| Metrics & alerts | `src/arbcore/monitoring/` | Never ROI alone; CRITICAL alerts never suppressed |
+| Walk-forward | `src/arbcore/backtest/walkforward.py` | Enforced, persisted out-of-sample budget |
+| Paper session | `src/arbcore/app/paper_session.py` | Wires all of the above |
 
 ## Quick start
 
 ```bash
 make install
-make check      # ruff + mypy --strict + pytest
+make check      # ruff + mypy --strict + pytest (253 tests)
+
+# The honest scenario: retail fees, calm spreads
+python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario realistic
+
+# Exercises the execution path (its P/L is an artefact of chosen parameters)
+python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario mechanics
+
+# Walk-forward; --out-of-sample spends this parameter set's budget, once
+python -m arbcore.app.run_walkforward --scenario mechanics
 ```
 
 Configuration lives in `config/risk_limits.paper.yaml`; copy `.env.example` to
@@ -58,6 +96,14 @@ development environment, research mode, live trading off.
 | [economic-viability.md](docs/economic-viability.md) | Minimum viable capital, net profit after infrastructure cost |
 | [regulatory.md](docs/regulatory.md) | DE/EU areas flagged for professional review (not advice) |
 | [roadmap.md](docs/roadmap.md) | 18 phases, deployment progression, live gate |
+| [PAPER_RUN_REPORT.md](docs/PAPER_RUN_REPORT.md) | **Results, defects found, and what follows** |
+| [paper-trading.md](docs/paper-trading.md) | Calibration mode, the simulated operator, scenarios |
+| [market-data-model.md](docs/market-data-model.md) | Book integrity rules, feeds, clocks, quality scoring |
+| [execution-model.md](docs/execution-model.md) | Executable prices, order state, idempotency, paper fills |
+| [backtesting.md](docs/backtesting.md) | Walk-forward and the out-of-sample ledger |
+| [monitoring.md](docs/monitoring.md) | Metrics, alerting, infrastructure cost |
+| [deployment.md](docs/deployment.md) | Environments, supervision, backup, health checks |
+| [incident-response.md](docs/incident-response.md) | Severities and the standing rules |
 
 ## Non-negotiables
 
@@ -69,3 +115,5 @@ development environment, research mode, live trading off.
 * No parameter optimisation against the final evaluation dataset.
 * No LLM anywhere on the trade-decision path; decisions are deterministic and
   reproducible.
+* No invented API endpoints, SDK methods or fee schedules. Venue facts are
+  recorded as `UNKNOWN` until read from official documentation.

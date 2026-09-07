@@ -33,6 +33,11 @@ from .proposal import TradeProposal
 #: the configured maximum. Tightening only; never a widening factor.
 NON_ATOMIC_SIZE_FACTOR: Decimal = Decimal("0.25")
 
+#: Calibration trades exist to measure execution outcomes we have no data for.
+#: They are capped at this fraction of max_trade_size, on top of every other
+#: limit, and are impossible outside paper mode.
+CALIBRATION_SIZE_FACTOR: Decimal = Decimal("0.10")
+
 
 @dataclass(frozen=True, slots=True)
 class RiskContext:
@@ -284,16 +289,7 @@ class RiskEngine:
 
         ev = proposal.risk_adjusted_ev(limits.cost_safety_factor)
         if ev is None:
-            checks.append(
-                CheckResult.fail(
-                    "risk_adjusted_ev",
-                    RejectReason.NEGATIVE_RISK_ADJUSTED_EV,
-                    detail=(
-                        "no measured execution probabilities; opportunity is research-only "
-                        "until an empirical basis exists"
-                    ),
-                )
-            )
+            checks.append(self._calibration_check(proposal, ctx))
         elif ev <= ZERO:
             checks.append(
                 CheckResult.fail(
@@ -306,6 +302,49 @@ class RiskEngine:
         else:
             checks.append(CheckResult.ok("risk_adjusted_ev", detail=str(ev)))
         return checks
+
+    def _calibration_check(self, proposal: TradeProposal, ctx: RiskContext) -> CheckResult:
+        """Handle a proposal with no measured execution probabilities.
+
+        Normally this rejects: an opportunity with no empirical basis is
+        research-only. The single exception is an explicitly flagged
+        calibration trade in paper mode, whose purpose is to *create* that
+        basis. It is still subject to every hard limit, plus its own size cap.
+        """
+        if not proposal.calibration:
+            return CheckResult.fail(
+                "risk_adjusted_ev",
+                RejectReason.NEGATIVE_RISK_ADJUSTED_EV,
+                detail=(
+                    "no measured execution probabilities; opportunity is research-only "
+                    "until an empirical basis exists"
+                ),
+            )
+        if ctx.profile.trading_mode is not TradingMode.PAPER:
+            return CheckResult.fail(
+                "calibration_mode",
+                RejectReason.TRADING_MODE_FORBIDS,
+                detail=(
+                    f"calibration trades are paper-only; mode is {ctx.profile.trading_mode}. "
+                    "Real capital is never committed to gather statistics."
+                ),
+            )
+        cap = ctx.limits.max_trade_size * CALIBRATION_SIZE_FACTOR
+        if proposal.notional > cap:
+            return CheckResult.fail(
+                "calibration_size",
+                RejectReason.TRADE_SIZE_EXCEEDED,
+                observed=proposal.notional,
+                limit=cap,
+                detail="calibration trades are capped below the normal trade size",
+            )
+        return CheckResult.ok(
+            "calibration_mode",
+            detail=(
+                "paper calibration trade: executed to measure execution outcomes, "
+                "excluded from performance reporting"
+            ),
+        )
 
     # ------------------------------------------------------------------
     # microstructure
@@ -352,8 +391,16 @@ class RiskEngine:
             ),
             _threshold(
                 "daily_trades",
-                Decimal(exposure.trades_today + 1),
-                Decimal(limits.max_daily_trades),
+                Decimal(
+                    (exposure.calibration_trades_today if proposal.calibration
+                     else exposure.trades_today)
+                    + 1
+                ),
+                Decimal(
+                    limits.max_daily_calibration_trades
+                    if proposal.calibration
+                    else limits.max_daily_trades
+                ),
                 RejectReason.DAILY_TRADE_LIMIT_REACHED,
             ),
             _threshold(

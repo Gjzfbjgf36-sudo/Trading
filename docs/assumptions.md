@@ -30,7 +30,11 @@ entries are deliberately `UNKNOWN`.
 | A10 | Our cost models understate real costs | LIKELY | Standard experience; expressed as `cost_safety_factor ≥ 1` |
 | A11 | The non-atomic size factor of 0.25 is prudent | UNCERTAIN | A judgement, not a measurement. Revisit with Phase 10 leg-risk data |
 | A12 | Paper-trading fills approximate real fills | UNKNOWN | Only Phase 16 paper-vs-reality measurement can promote this |
-| A13 | Execution probabilities can be estimated from our own data | UNKNOWN | No data yet; until then EV is `None` and opportunities are research-only |
+| A13 | Execution probabilities can be estimated from our own data | LIKELY | Demonstrated in paper: 196 measured attempts produced stable estimates. Promotion to CONFIRMED needs real fills |
+| A14 | Leg-risk fraction of 0.15% for an unmatched CEX/CEX leg | UNCERTAIN | A judgement. Paper runs produced 123 unmatched legs in 196 attempts, so the line is material and worth measuring properly |
+| A15 | Competition takes ~35% of visible opportunities at a 2–20 bps cost | UNCERTAIN | Chosen to be pessimistic, not to be right. It is the single most influential parameter in the paper results (profit factor 672 → 3.2) and must be replaced by measurement |
+| A16 | Retail taker fees exceed available CEX/CEX BTC spreads by ~170 bps | CONFIRMED (arithmetic) | Follows from the published fee tiers and the cost stack; independent of the price process. See PAPER_RUN_REPORT.md §1 |
+| A17 | Paper fills approximate real fills | UNKNOWN | Unchanged. Only Phase 16 paper-vs-reality measurement can promote this |
 
 ## Venue and integration assumptions
 

@@ -29,3 +29,6 @@ logs/
 *.sqlite
 *.sqlite3
 *.db
+
+# Paper-run outputs (reproducible from seeds; not source)
+artifacts/

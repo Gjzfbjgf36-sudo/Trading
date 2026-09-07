@@ -6,22 +6,22 @@ remaining, known limitations) and **stops for approval**. No phase is skipped.
 
 | Phase | Content | Status |
 |---|---|---|
-| 1 | Architecture and risk model | **COMPLETE — awaiting approval** |
-| 2 | Market-data infrastructure (WebSocket, snapshots, heartbeats, sequencing, gap/dup/order detection) | Not started |
-| 3 | CEX adapters (from current official docs; version, auth, rate limits, order semantics, fees, withdrawal constraints recorded) | Not started |
-| 4 | DEX adapters (executable quotes, pools, simulation, protocol whitelist with verified addresses) | Not started |
-| 5 | Data validation and data-quality scoring | Not started |
-| 6 | Opportunity engine (executable-price/VWAP-at-size, per strategy) | Not started |
-| 7 | Profit engine (full cost stack, safety margin, risk-adjusted EV) | Not started |
-| 8 | Risk engine extension (wired to live limits, budgets, breakers) | Partly delivered in Phase 1 |
-| 9 | Inventory engine (per-venue balances, imbalance, rebalancing as a separate operation) | Not started |
-| 10 | Paper execution (same decision architecture as live; simulated slippage, impact, fees, latency, partial fills, failures, decay) | Not started |
-| 11 | Backtesting (train/validation/out-of-sample, walk-forward, bias controls) + economic viability | Not started |
-| 12 | Failure and chaos testing | Not started |
-| 13 | Monitoring, alerting, infrastructure-cost tracking | Not started |
-| 14 | Reconciliation and crash recovery | Not started |
-| 15 | Security testing | Not started |
-| 16 | Long-duration paper trading + paper-vs-reality validation | Not started |
+| 1 | Architecture and risk model | **Complete** |
+| 2 | Market-data infrastructure: book integrity, sequencing, gap/duplicate/out-of-order detection, heartbeats, reconnect backoff, clock tracking | **Complete** (transport layer pending adapters) |
+| 3 | CEX adapters | **Blocked** — needs current official documentation; interfaces defined, nothing invented |
+| 4 | DEX adapters | **Blocked** — needs verified contract addresses and official docs |
+| 5 | Data validation and data-quality scoring | **Complete** |
+| 6 | Opportunity engine (VWAP-at-size, CEX/CEX) | **Complete** for CEX/CEX |
+| 7 | Profit engine (full cost stack, safety margin, risk-adjusted EV) | **Complete** |
+| 8 | Risk engine | **Complete** |
+| 9 | Inventory engine (reservations, idempotency, minimum reserve, imbalance) | **Complete**; automated rebalancing deliberately not built |
+| 10 | Paper execution incl. adverse selection | **Complete** |
+| 11 | Walk-forward with an enforced out-of-sample budget + economic viability | **Complete** (synthetic data) |
+| 12 | Failure and chaos testing | **Complete** — 253 tests |
+| 13 | Monitoring, alerting, infrastructure-cost tracking | **Complete** |
+| 14 | Reconciliation and crash recovery | **Complete** |
+| 15 | Security testing | Partial — secret-leakage and isolation tests exist; API-permission tests need adapters |
+| 16 | Long-duration paper trading | **Done on synthetic data**; paper-vs-reality blocked on adapters |
 | 17 | Canary architecture | Not started |
 | 18 | Optional live execution — **operator decision, never automatic** | Gated |
 

@@ -48,6 +48,17 @@ that closes them.
 | 36 | Tax treatment and record keeping | Regulatory | H | M | Professional review | Full immutable trade records; professional advice required | M | OPEN | Quarterly |
 | 37 | Market-abuse considerations | Regulatory | L | H | Professional review | Flagged for review before any commercial use | H | OPEN | Quarterly |
 
+### Discovered by paper trading (see PAPER_RUN_REPORT.md)
+
+| # | Risk | Category | Prob | Impact | Detection | Mitigation | Residual | Status | Review |
+|---|---|---|---|---|---|---|---|---|---|
+| 38 | Working inventory is marked to market; drift alone consumes the asset-exposure budget and halts trading | Liquidity | H | M | Rejection histogram dominated by ASSET_EXPOSURE_EXCEEDED | Working inventory capped at 60% of `max_asset_exposure`; remainder is drift headroom | M | Mitigated | Weekly |
+| 39 | Human-intervention rate makes the system unoperable unattended | Technology | M | M | Interventions per day; halted-tick count | Reliability (stop) and sizing (degrade) separated; only genuine failures halt | M | Mitigated; residual is inherent to fail-closed design | Weekly |
+| 40 | Calibration bootstrap: measured probabilities need trades, trades need probabilities | Model | H | M | No accepted opportunities despite positive edge | Explicit paper-only, size-capped calibration mode with its own budget; results excluded from performance | L | Mitigated | Per change |
+| 41 | A kind simulator produces a strategy that only works in the simulator | Model | H | H | Implausible win rate / profit factor | Adverse-selection model; win rate fell 98%→52%, profit factor 672→3.2 | M | Mitigated, but the model is an assumption not a measurement | Weekly |
+| 42 | Daily limits that never reset become lifetime limits | Technology | M | M | Rejections dominated by a daily limit | UTC day rollover; tested | L | Mitigated | Per change |
+| 43 | Reserving at the decision price under-funds the fill | Execution | H | M | Settlement exceeding reservation | Reserve at the limit price | L | Mitigated | Per change |
+
 ## How to use this register
 
 * A row marked **OPEN** is not a to-do that can be waived. The phase named in

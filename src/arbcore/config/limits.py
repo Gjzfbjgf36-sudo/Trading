@@ -41,6 +41,12 @@ class RiskLimits:
     max_daily_loss: Decimal
     max_daily_trades: int
     max_concurrent_trades: int
+    #: Separate daily budget for paper calibration trades. It does not weaken
+    #: max_daily_trades: calibration is impossible outside paper mode, so this
+    #: budget can never authorise real turnover. Without it, a 50-sample
+    #: calibration target consumes a 50-trade daily limit exactly, and the
+    #: strategy can never place a non-calibration trade on its first day.
+    max_daily_calibration_trades: int
     # --- inventory --------------------------------------------------------
     max_inventory_imbalance: Decimal
     min_reserve_balance: Decimal
@@ -82,6 +88,7 @@ class RiskLimits:
     )
     _POSITIVE_INTS = (
         "max_daily_trades",
+        "max_daily_calibration_trades",
         "max_concurrent_trades",
         "max_quote_age_ms",
         "max_execution_latency_ms",
@@ -181,7 +188,7 @@ def limits_from_mapping(data: Mapping[str, Any]) -> RiskLimits:
     missing = known - set(data)
     if missing:
         raise ConfigError(f"missing risk limit keys: {sorted(missing)}")
-    int_fields = set(RiskLimits._POSITIVE_INTS) | {"max_daily_trades", "max_concurrent_trades"}
+    int_fields = set(RiskLimits._POSITIVE_INTS)
     kwargs: dict[str, Any] = {}
     for name in known:
         raw = data[name]

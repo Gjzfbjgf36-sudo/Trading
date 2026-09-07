@@ -125,6 +125,10 @@ class TradeProposal:
     probabilities: ExecutionProbabilities | None = None
     #: Budget the strategy intends to reserve, per risk category.
     budget_reservation: dict[RiskCategory, Decimal] = field(default_factory=dict)
+    #: Data-gathering trade run to *measure* execution probabilities that do
+    #: not exist yet. Permitted only in paper mode, only below a hard size cap,
+    #: and excluded from performance reporting. See docs/paper-trading.md.
+    calibration: bool = False
     created_at: datetime | None = None
 
     def __post_init__(self) -> None:
