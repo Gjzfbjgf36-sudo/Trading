@@ -390,3 +390,77 @@ def test_decisions_are_reproducible():
     first = gate().evaluate(a_signal(), an_account(), now=NOW)
     second = gate().evaluate(a_signal(), an_account(), now=NOW)
     assert first.decision.as_dict()["checks"] == second.decision.as_dict()["checks"]
+
+
+# --- reward to risk ------------------------------------------------------
+
+
+def test_the_reward_to_risk_floor_defaults_above_one():
+    """A 1.0 target needs a >50% win rate, which trend rules do not have."""
+    from arbcore.decide.gate import GateConfig
+
+    assert GateConfig(risk=RiskProfile()).min_reward_to_risk >= Decimal("1.5")
+
+
+def test_a_one_to_one_target_is_now_refused():
+    verdict = gate().evaluate(a_signal(target=Decimal("63000")), an_account(), now=NOW)
+    assert not verdict.green
+    assert "Trefferquote" in verdict.explain()
+
+
+def test_the_rejection_states_the_break_even_win_rate():
+    verdict = gate().evaluate(a_signal(target=Decimal("63000")), an_account(), now=NOW)
+    detail = " ".join(c.detail for c in verdict.decision.failures)
+    assert "50 % Trefferquote" in detail
+
+
+def test_a_target_meeting_the_floor_passes():
+    verdict = gate().evaluate(a_signal(target=Decimal("64500")), an_account(), now=NOW)
+    assert verdict.green, verdict.explain()
+
+
+# --- affordability -------------------------------------------------------
+
+
+def test_scalping_is_unaffordable_at_retail_fees():
+    """The number behind 'high transaction costs'."""
+    from arbcore.decide.costcheck import COMMON_PROFILES, assess
+
+    scalping = next(p for p in COMMON_PROFILES if p.name == "Scalping")
+    result = assess(scalping, equity=Decimal("1000"), fee_rate=Decimal("0.0026"))
+    assert result.monthly_fee_share_of_equity > Decimal("1")  # over 100% per month
+    assert result.verdict.startswith("NEIN")
+
+
+def test_slow_trend_following_is_affordable():
+    from arbcore.decide.costcheck import COMMON_PROFILES, assess
+
+    trend = next(p for p in COMMON_PROFILES if p.name.startswith("Trendfolge"))
+    result = assess(trend, equity=Decimal("1000"), fee_rate=Decimal("0.0026"))
+    assert result.monthly_fee_share_of_equity < Decimal("0.01")
+    assert result.verdict == "tragbar"
+
+
+def test_a_zero_fee_venue_changes_the_answer():
+    """The constraint is the fee, not the strategy."""
+    from arbcore.decide.costcheck import COMMON_PROFILES, assess
+
+    scalping = next(p for p in COMMON_PROFILES if p.name == "Scalping")
+    free = assess(scalping, equity=Decimal("1000"), fee_rate=Decimal("0"))
+    assert not free.stop_is_mostly_fees
+
+
+def test_a_tight_stop_is_mostly_fees():
+    from arbcore.decide.costcheck import StrategyProfile, assess
+
+    tight = StrategyProfile("tight", Decimal("10"), Decimal("0.0005"))
+    result = assess(tight, equity=Decimal("1000"), fee_rate=Decimal("0.0026"))
+    assert result.stop_is_mostly_fees
+
+
+def test_the_report_names_every_profile():
+    from arbcore.decide.costcheck import COMMON_PROFILES, report
+
+    text = report(equity=Decimal("1000"), fee_rate=Decimal("0.0026"))
+    for profile in COMMON_PROFILES:
+        assert profile.name in text

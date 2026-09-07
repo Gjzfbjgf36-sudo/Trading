@@ -106,12 +106,13 @@ favourable probabilities; an unmonitored condition is not a healthy one.
 | Decision review | `src/arbcore/review/performance.py` | No verdict below 30 trades; measures what deviating costs you |
 | Account ledger | `src/arbcore/decide/account.py` | Equity, peak and daily loss derived from the journal, never typed |
 | Webhook receiver | `src/arbcore/decide/webhook.py` | TradingView alerts; queues verdicts, never files a plan for you |
+| Affordability | `src/arbcore/decide/costcheck.py` | Which strategy classes your fee rate can support at all |
 
 ## Quick start
 
 ```bash
 make install
-make check      # ruff + mypy --strict + pytest (387 tests)
+make check      # ruff + mypy --strict + pytest (396 tests)
 
 # The honest scenario: retail fees, calm spreads
 python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario realistic

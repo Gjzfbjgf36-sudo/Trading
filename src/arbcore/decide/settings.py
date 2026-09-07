@@ -36,6 +36,8 @@ class DecideSettings:
     symbol: str = "BTCUSD"
     journal_path: str = "journal/decisions.sqlite"
     max_open_positions: int = 3
+    #: Minimum reward-to-risk. See GateConfig for why 1.0 is not enough.
+    min_reward_to_risk: Decimal = Decimal("1.5")
     #: False until you have met every condition in docs/ANLEITUNG.md.
     real_money: bool = False
 
@@ -52,6 +54,14 @@ class DecideSettings:
             )
         if self.min_notional < ZERO:
             raise SettingsError("min_notional must be >= 0")
+        ratio = to_decimal(self.min_reward_to_risk)
+        object.__setattr__(self, "min_reward_to_risk", ratio)
+        if ratio < Decimal(1):
+            raise SettingsError(
+                f"min_reward_to_risk of {ratio} means the target pays less than "
+                "the trade risks. No win rate a rule-based system achieves "
+                "recovers from that."
+            )
 
     def as_dict(self) -> dict[str, str]:
         return {
@@ -62,6 +72,7 @@ class DecideSettings:
             "risk_per_trade": str(self.risk.risk_per_trade),
             "daily_loss_limit": str(self.risk.daily_loss_limit),
             "max_drawdown": str(self.risk.max_drawdown),
+            "min_reward_to_risk": str(self.min_reward_to_risk),
             "real_money": str(self.real_money),
         }
 
@@ -98,6 +109,7 @@ def settings_from_mapping(data: Mapping[str, Any]) -> DecideSettings:
         "symbol",
         "journal_path",
         "max_open_positions",
+        "min_reward_to_risk",
         "real_money",
         "risk_per_trade",
         "daily_loss_limit",
@@ -128,5 +140,6 @@ def settings_from_mapping(data: Mapping[str, Any]) -> DecideSettings:
         symbol=str(data.get("symbol", "BTCUSD")),
         journal_path=str(data.get("journal_path", "journal/decisions.sqlite")),
         max_open_positions=int(data.get("max_open_positions", 3)),
+        min_reward_to_risk=to_decimal(str(data.get("min_reward_to_risk", "1.5"))),
         real_money=bool(data.get("real_money", False)),
     )

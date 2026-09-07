@@ -29,6 +29,11 @@ max_position_fraction: "0.25"
 
 max_open_positions: 3
 
+# Mindest-Chance-Risiko-Verhältnis. Bei 1.0 zahlt das Ziel genau das, was du
+# riskierst — dafür bräuchtest du über 50 % Trefferquote. Trendfolge hat 35-45 %.
+# Die übliche Empfehlung von 1.5 bis 2.0 kommt genau daher.
+min_reward_to_risk: "1.5"
+
 # Auf true erst, wenn ALLE vier Bedingungen aus docs/ANLEITUNG.md erfüllt sind.
 # Der Wert ändert keine einzige Prüfung — er wird nur im Journal festgehalten,
 # damit Papier- und Echtgeld-Ergebnisse nie vermischt werden.

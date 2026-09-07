@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 
 from ..decide.account import AccountLedger
+from ..decide.costcheck import report as cost_report
 from ..decide.gate import GateConfig, Signal, SignalGate
 from ..decide.journal import ExitReason, Journal, PlanIncomplete
 from ..decide.settings import DEFAULT_PATH, DecideSettings, SettingsError, load_settings
@@ -34,6 +35,7 @@ def _gate(settings: DecideSettings) -> SignalGate:
             fee_rate=settings.fee_rate,
             min_notional=settings.min_notional,
             max_open_positions=settings.max_open_positions,
+            min_reward_to_risk=settings.min_reward_to_risk,
         )
     )
 
@@ -178,6 +180,11 @@ def main() -> int:
     )
 
     sub.add_parser("open", help="offene Positionen")
+    costs = sub.add_parser(
+        "costcheck", help="welche Strategieklassen deine Gebühren überhaupt tragen"
+    )
+    costs.add_argument("--equity", default=None, help="Standard: dein Startkapital")
+    costs.add_argument("--fee-rate", dest="fee_rate", default=None)
     sub.add_parser("review", help="was deine eigenen Entscheidungen zeigen")
     pending = sub.add_parser("pending", help="empfangene Webhook-Signale")
     pending.add_argument("--queue", default="journal/signals.sqlite")
@@ -197,6 +204,15 @@ def main() -> int:
     except SettingsError as exc:
         print(f"Konfiguration: {exc}")
         return 2
+
+    if args.command == "costcheck":
+        print(
+            cost_report(
+                equity=Decimal(args.equity) if args.equity else settings.starting_capital,
+                fee_rate=Decimal(args.fee_rate) if args.fee_rate else settings.fee_rate,
+            )
+        )
+        return 0
 
     if args.command == "pending":
         queue = SignalQueue(args.queue)

@@ -176,6 +176,48 @@ Ab 30 Trades sagt dir die Auswertung eines von zwei Dingen:
 
 ---
 
+## Welche Strategie passt zu deinen Gebühren?
+
+Bevor du dich für einen Ansatz entscheidest:
+
+```bash
+python -m arbcore.app.run_gate costcheck
+```
+
+Bei 1000 € Konto und 0,26 % Gebühr:
+
+```
+Strategie                  Trades/Mon  Gebühr/Mon  % Konto  Urteil
+Scalping                         2000     2080.00  208.00%  NEIN
+Momentum                          120      124.80   12.48%  NEIN
+News                               40       41.60    4.16%  NEIN
+Breakout (Intraday)                40       41.60    4.16%  NEIN
+Pullback                           20       20.80    2.08%  grenzwertig
+Trendfolge (Tageskerzen)            2        2.08    0.21%  tragbar
+```
+
+Scalping würde bei diesem Konto **mehr als das doppelte Kapital pro Jahr** an
+Gebühren kosten, bevor ein einziger Kursgewinn entsteht. Das ist kein Argument
+gegen Scalping als Methode — es ist ein Argument gegen Scalping *bei diesen
+Gebühren und dieser Kontogröße*.
+
+Die Zeilen sind Größenordnungen zum Vergleich. Das Verhältnis zwischen ihnen
+stimmt trotzdem, und es entscheidet mehr als jede Indikatorwahl.
+
+### Chance-Risiko-Verhältnis
+
+Das Gate verlangt standardmäßig **1,5** (einstellbar über `min_reward_to_risk`).
+Grund: Bei einem CRV von 1,0 zahlt das Ziel genau das, was du riskierst — dafür
+bräuchtest du über 50 % Trefferquote. Trendfolge liegt bei 35–45 %. Ein
+abgelehntes Signal sagt dir die nötige Trefferquote direkt:
+
+```
+blockiert durch reward_to_risk [BELOW_SAFETY_MARGIN] — CRV 1.00 — bei diesem
+Verhältnis brauchst du 50 % Trefferquote, nur um auf null zu kommen
+```
+
+---
+
 ## Optional: TradingView automatisch anbinden
 
 Statt Signale von Hand einzutippen, kann TradingView sie schicken. Wichtig:

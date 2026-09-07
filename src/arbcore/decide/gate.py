@@ -97,6 +97,11 @@ class GateConfig:
     #: late alert prices a market that has moved.
     max_signal_age: timedelta = timedelta(minutes=30)
     max_open_positions: int = 3
+    #: Minimum reward-to-risk before a target is worth taking. 1.0 means the
+    #: target pays exactly what is risked, which needs a win rate above 50% to
+    #: break even — higher than trend-following rules achieve. The usual
+    #: guidance of 1.5 to 2.0 exists for that reason.
+    min_reward_to_risk: Decimal = Decimal("1.5")
 
 
 @dataclass(frozen=True, slots=True)
@@ -295,17 +300,21 @@ class SignalGate:
                 risk_distance = abs(signal.entry - signal.stop)
                 reward = abs(signal.target - signal.entry)
                 ratio = reward / risk_distance if risk_distance > ZERO else ZERO
-                if ratio < Decimal(1):
+                required = cfg.min_reward_to_risk
+                if ratio < required:
+                    break_even = (Decimal(1) / (Decimal(1) + ratio)).quantize(
+                        Decimal("0.01")
+                    ) if ratio > ZERO else Decimal(1)
                     checks.append(
                         CheckResult.fail(
                             "reward_to_risk",
                             RejectReason.BELOW_SAFETY_MARGIN,
                             observed=ratio,
-                            limit=Decimal(1),
+                            limit=required,
                             detail=(
-                                "du riskierst mehr, als das Ziel einbringt. Das "
-                                "braucht über 50 % Trefferquote, um überhaupt "
-                                "auf null zu kommen"
+                                f"CRV {ratio} — bei diesem Verhältnis brauchst du "
+                                f"{break_even * 100:.0f} % Trefferquote, nur um auf "
+                                f"null zu kommen"
                             ),
                         )
                     )
