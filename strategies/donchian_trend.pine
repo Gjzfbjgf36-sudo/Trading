@@ -1,0 +1,80 @@
+//@version=5
+// Slow trend following on daily bars — the starter rule.
+//
+// WHY THIS ONE: two parameters, decades of public study, and almost nothing to
+// overfit. It is the most boring defensible choice, which is the point.
+//
+// WHAT IT DOES: enter long when price closes above the highest high of the last
+// `entry_len` bars; exit when it closes below the lowest low of the last
+// `exit_len` bars. Long only — shorting has different risk and needs its own
+// study.
+//
+// HONEST EXPECTATIONS (this class of rule, not this exact code):
+//   * win rate roughly 35-45%. You will be wrong more often than right.
+//   * long flat stretches and strings of small losses are normal, not broken.
+//   * drawdowns of 20-30% happen.
+// If you change the rule after six losses, you no longer have a rule.
+//
+// BACKTEST HONESTLY BEFORE USING:
+//   1. Set Properties -> Commission to your venue's real taker fee, and add
+//      slippage. TradingView defaults to zero for both, which is how backtests
+//      lie.
+//   2. Leave `calc_on_every_tick` off (the default). Turning it on makes
+//      intrabar results that will not reproduce live.
+//   3. This uses only confirmed closes, so it does not repaint. Any indicator
+//      you add on top must be checked for the same.
+//   4. A result that looks excellent after two parameter tweaks is a result
+//      you fitted. Note every variant you try — they all count.
+
+strategy("Donchian Trend (daily, long only)",
+     overlay = true,
+     initial_capital = 1000,
+     default_qty_type = strategy.percent_of_equity,
+     default_qty_value = 100,
+     commission_type = strategy.commission.percent,
+     commission_value = 0.26,        // set this to YOUR venue's taker fee
+     slippage = 2,
+     process_orders_on_close = true)
+
+entry_len = input.int(55, "Entry breakout (bars)", minval = 10, maxval = 200,
+     tooltip = "Enter when price closes above the highest high of this many bars.")
+exit_len  = input.int(20, "Exit breakdown (bars)", minval = 5, maxval = 100,
+     tooltip = "Exit when price closes below the lowest low of this many bars.")
+atr_len   = input.int(20, "ATR length (for the stop)", minval = 5, maxval = 100)
+atr_mult  = input.float(2.0, "Stop distance (ATR multiples)", minval = 0.5, maxval = 10.0)
+
+// Highest/lowest of the PREVIOUS bars, excluding the current one. Including the
+// current bar would compare a level against itself and never trigger cleanly.
+upper = ta.highest(high, entry_len)[1]
+lower = ta.lowest(low, exit_len)[1]
+atr   = ta.atr(atr_len)
+
+// The stop is what the position is sized against, so it must be defined by the
+// rule and not chosen afterwards by eye.
+stop_level = close - atr_mult * atr
+
+long_signal = close > upper
+exit_signal = close < lower
+
+plot(upper, "Entry level", color = color.new(color.teal, 40))
+plot(lower, "Exit level",  color = color.new(color.orange, 40))
+plot(strategy.position_size > 0 ? stop_level : na, "Stop", color = color.new(color.red, 20))
+
+if long_signal and strategy.position_size == 0
+    strategy.entry("long", strategy.long)
+
+if exit_signal and strategy.position_size > 0
+    strategy.close("long", comment = "exit breakdown")
+
+// --- webhook payload ------------------------------------------------------
+// Create an alert on this strategy and paste {{strategy.order.alert_message}}
+// into the message box. The gate parses this JSON; it decides nothing itself.
+// `ref` makes a redelivered alert recognisable as a duplicate.
+alert_entry = str.format(
+     '{{"ref":"{0}-{1}","symbol":"{2}","side":"BUY","entry":{3},"stop":{4},"source":"donchian_{5}_{6}"}}',
+     syminfo.ticker, str.tostring(time), syminfo.ticker,
+     str.tostring(close), str.tostring(stop_level),
+     str.tostring(entry_len), str.tostring(exit_len))
+
+if long_signal and strategy.position_size == 0
+    alert(alert_entry, alert.freq_once_per_bar_close)

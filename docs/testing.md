@@ -12,7 +12,7 @@ make check        # all three
 
 ## Current status
 
-311 tests, all passing. `ruff check` clean. `mypy --strict` clean over
+346 tests, all passing. `ruff check` clean. `mypy --strict` clean over
 `src/arbcore`.
 
 | Area | File | What it pins down |
@@ -33,6 +33,7 @@ make check        # all three
 | AMM / gas | `tests/test_amm_and_gas.py` | curve impact separated from fee; no size covers a non-positive edge; reverts still cost gas |
 | DEX strategy | `tests/test_dex_strategy.py` | L1 gas makes a dislocation untradeable that L2 gas makes tradeable; only atomic strategies may declare a reduced exposure delta |
 | DEX session | `tests/test_dex_session.py` | fast competitors remove the strategy entirely; every unknown outcome costs a human intervention |
+| Decision system | `tests/test_decide.py` | size follows risk not account size; a vague thesis is refused; plans cannot be rewritten; outcomes written once; no verdict below 30 trades |
 
 Test method: every rejection test starts from a context and proposal that
 *should* be accepted, then breaks exactly one thing. A rule that silently stops

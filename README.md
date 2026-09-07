@@ -41,6 +41,23 @@ trades**. Nobody has measured where the real value lies.
 positive number a statement about an assumption rather than about the strategy,
 and what read-only measurement would settle it.
 
+## Entscheidungssystem (Einstieg)
+
+Neben der Forschungsplattform gibt es ein **Entscheidungssystem ohne Orderpfad**:
+Es prüft ein Signal aus einer Regel, die du selbst geschrieben und backgetestet
+hast, sagt dir ob und wie groß — und hält fest, was du vorher behauptet hast.
+
+```bash
+python -m arbcore.app.run_gate check --symbol BTCUSD --side BUY \
+    --entry 60000 --stop 57000 --equity 1000 --source donchian_55_20
+```
+
+Anleitung ohne Vorkenntnisse: **[docs/ANLEITUNG.md](docs/ANLEITUNG.md)**.
+Startregel für TradingView: `strategies/donchian_trend.pine`.
+
+Es erzeugt keinen Edge. Es verhindert die Fehler, die kleine Konten zerlegen,
+und misst über 30+ Trades, ob deine Regel überhaupt eine ist.
+
 ## Operating principle
 
 > **When in doubt → do not trade.**
@@ -82,12 +99,16 @@ favourable probabilities; an unmonitored condition is not a healthy one.
 | Chain execution | `src/arbcore/execution/chain.py` | Simulate-then-send, reverts, dropped txs, idempotency |
 | Walk-forward | `src/arbcore/backtest/walkforward.py` | Enforced, persisted out-of-sample budget |
 | Paper session | `src/arbcore/app/paper_session.py` | Wires all of the above |
+| Position sizing | `src/arbcore/decide/sizing.py` | Size from risk, never from account size; fees are part of the loss |
+| Pre-commitment journal | `src/arbcore/decide/journal.py` | Thesis and invalidation before entry; plans cannot be rewritten |
+| Signal gate | `src/arbcore/decide/gate.py` | Green or no, with the specific check that blocked it. No order path |
+| Decision review | `src/arbcore/review/performance.py` | No verdict below 30 trades; measures what deviating costs you |
 
 ## Quick start
 
 ```bash
 make install
-make check      # ruff + mypy --strict + pytest (311 tests)
+make check      # ruff + mypy --strict + pytest (346 tests)
 
 # The honest scenario: retail fees, calm spreads
 python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario realistic
