@@ -21,6 +21,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from ..decide.account import AccountLedger
+from ..decide.board import build_board
 from ..decide.costcheck import report as cost_report
 from ..decide.gate import GateConfig, Signal, SignalGate
 from ..decide.journal import ExitReason, Journal, PlanIncomplete
@@ -37,11 +38,13 @@ from ..decide.settings import DEFAULT_PATH, DecideSettings, SettingsError, load_
 from ..decide.setup_check import report as setup_report
 from ..decide.webhook import SignalQueue, make_server
 from ..domain.types import Side
+from ..marketdata.candles import BadCandleData, load_csv
 from ..review.performance import (
     deviation_comparison,
     review_journal,
     source_comparison,
 )
+from ..strategy.rules import AVAILABLE
 
 
 def _gate(settings: DecideSettings) -> SignalGate:
@@ -250,6 +253,13 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("status", help="Kontostand, Drawdown, offene Positionen")
+    board = sub.add_parser(
+        "board", help="ein Bildschirm: Konto, offene Positionen, Märkte, was jetzt zu tun ist"
+    )
+    board.add_argument(
+        "--csv", nargs="*", default=[], help="eine CSV je Markt, wie bei scan"
+    )
+    board.add_argument("--rule", choices=sorted(AVAILABLE), default="donchian")
     sub.add_parser("setup", help="Ist alles eingerichtet? Was ist der nächste Schritt?")
     check = sub.add_parser("check", help="Darf dieser Trade laufen, und wie groß?")
     _add_signal_args(check)
@@ -363,6 +373,29 @@ def main() -> int:
         if args.command == "status":
             print(ledger.summary(today=now.date()))
             return 0
+
+        if args.command == "board":
+            markets = {}
+            for path in args.csv:
+                try:
+                    markets[Path(path).stem] = load_csv(path)
+                except BadCandleData as exc:
+                    print(str(exc))
+                    return 1
+            screen = build_board(
+                rule=AVAILABLE[args.rule],
+                markets=markets,
+                account=ledger.state(today=now.date()),
+                open_positions=journal.open_positions(),
+                starting_capital=settings.starting_capital,
+                max_open_positions=settings.max_open_positions,
+                time_stop_bars=settings.time_stop_bars,
+                now=now,
+            )
+            print(screen.render())
+            # Etwas zu tun heisst Exit-Code 0; nichts zu tun heisst 1, damit ein
+            # Skript den Unterschied kennt, ohne die Ausgabe zu lesen.
+            return 0 if (screen.firing or screen.overdue) else 1
         if args.command == "wizard":
             return wizard(settings, journal, now)
         if args.command == "serve":

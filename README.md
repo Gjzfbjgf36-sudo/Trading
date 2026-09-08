@@ -55,6 +55,8 @@ python -m arbcore.app.run_gate wizard              # geführt: prüfen und Plan 
 python -m arbcore.app.run_gate serve --token ...   # optional: TradingView-Webhook
 ```
 
+Der tägliche Ablauf auf einer Seite: **[docs/MORGENS.md](docs/MORGENS.md)**.
+Ein Bildschirm mit dem ganzen Stand: `run_gate board --csv records/*.csv`.
 Anleitung ohne Vorkenntnisse: **[docs/ANLEITUNG.md](docs/ANLEITUNG.md)**.
 Zwei Startregeln für TradingView — **eine** auswählen, nicht beide:
 `strategies/donchian_trend.pine` (Ausbruch, 2 Parameter) oder
@@ -150,6 +152,8 @@ development environment, research mode, live trading off.
 
 | Document | Contents |
 |---|---|
+| [MORGENS.md](docs/MORGENS.md) | Der tägliche Ablauf: Kurse holen, board, handeln, schließen |
+| [REAL_DATA_REPORT.md](docs/REAL_DATA_REPORT.md) | Erster Lauf gegen echte Kraken-Kurse, und welcher Hebel wirklich wirkt |
 | [architecture.md](docs/architecture.md) | Layering, the risk-engine contract, lifecycle, safety subsystem |
 | [risk-management.md](docs/risk-management.md) | Limits, budgets, prohibited behaviours, inventory model |
 | [risk-register.md](docs/risk-register.md) | 37 tracked risks with detection, mitigation and residual rating |

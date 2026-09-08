@@ -264,7 +264,7 @@ class Journal:
         """
         rows = self.conn.execute(
             "SELECT ref, symbol, side, entry, stop, target, quantity, thesis,"
-            " invalidation, signal_source"
+            " invalidation, signal_source, opened_at"
             " FROM commitments WHERE closed_at IS NULL ORDER BY opened_at"
         ).fetchall()
         return tuple(
