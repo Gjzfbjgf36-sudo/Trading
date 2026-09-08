@@ -213,6 +213,25 @@ ganzen System — sie misst, was dich das Übergehen deiner eigenen Regel kostet
 
 ---
 
+## Alerts mit Bedingung — „kauf, wenn die nächste Kerze grün wird"
+
+Das ist die bessere Form einer Einschätzung, weil die Bedingung **vorher**
+feststeht und hinterher niemand darüber streiten muss:
+
+```bash
+python -m arbcore.app.run_gate read --ref BTC-W1 \
+    --observed "Kurs 59800, über EMA200, gestern rote Kerze" \
+    --view "Nimmt die nächste Kerze das gestrige Hoch, ist das ein Engulfing im Trend" \
+    --when "nächste Tageskerze schließt grün über 60000" \
+    --entry 60000 --stop 57000 --target 66000
+```
+
+Wartende Bedingungen ansehen: `run_gate armed`.
+Tritt sie ein: `run_gate trigger --ref BTC-W1`, dann `check`.
+
+Tritt sie **nicht** ein, war die Einschätzung nicht falsch — sie kam nur nie zur
+Anwendung. Das wird getrennt gezählt, statt als Treffer oder Fehlschlag.
+
 ## Meine Einschätzung mitlaufen lassen — und messen
 
 Du kannst mich einen Chart ansehen lassen und fragen, ob du kaufen sollst. Ich

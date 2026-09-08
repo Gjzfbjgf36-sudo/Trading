@@ -17,11 +17,13 @@ from __future__ import annotations
 import argparse
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 from ..decide.account import AccountLedger
 from ..decide.costcheck import report as cost_report
 from ..decide.gate import GateConfig, Signal, SignalGate
 from ..decide.journal import ExitReason, Journal, PlanIncomplete
+from ..decide.reads import ChartRead, Conviction, ReadLog, RuleVerdict, calibration
 from ..decide.settings import DEFAULT_PATH, DecideSettings, SettingsError, load_settings
 from ..decide.setup_check import report as setup_report
 from ..decide.webhook import SignalQueue, make_server
@@ -161,6 +163,70 @@ def serve(settings: DecideSettings, journal: Journal, args: argparse.Namespace) 
     return 0
 
 
+def _read_log_path(settings: DecideSettings) -> str:
+    """The read log lives beside the journal; they are one record in two files."""
+    return str(Path(settings.journal_path).with_name("chart_reads.sqlite"))
+
+
+def _context(
+    settings: DecideSettings, journal: Journal, ledger: AccountLedger, now: datetime
+) -> str:
+    """Everything a fresh session needs before it says anything about a chart.
+
+    Written for the case where the assistant has no memory of what it said last
+    time. Without this it would give an assessment today, forget it, and give a
+    differently-worded one tomorrow on the same chart.
+    """
+    parts = [
+        "=== STAND ===",
+        ledger.summary(today=now.date()),
+        "",
+        "=== OFFENE POSITIONEN ===",
+    ]
+    open_rows = journal.open_positions()
+    if not open_rows:
+        parts.append("keine")
+    for row in open_rows:
+        parts.append(
+            f"{row['ref']}  {row['symbol']} {row['side']}  Einstieg {row['entry']}  "
+            f"Stop {row['stop']}  Ziel {row['target'] or '-'}"
+        )
+        parts.append(f"    These: {row['thesis']}")
+
+    log = ReadLog(_read_log_path(settings))
+    try:
+        parts += ["", "=== WARTENDE BEDINGUNGEN ==="]
+        armed_rows = log.armed()
+        if not armed_rows:
+            parts.append("keine")
+        for row in armed_rows:
+            parts.append(f"{row['ref']}: WENN {row['trigger_condition']}")
+
+        parts += ["", "=== LETZTE EINSCHÄTZUNGEN ==="]
+        recent = log.recent(limit=5)
+        if not recent:
+            parts.append("keine")
+        for row in recent:
+            marker = "*" if row["acted"] == "1" else " "
+            parts.append(f"{marker} {row['at'][:10]} {row['ref']} ({row['conviction']})")
+            parts.append(f"    gesehen:  {row['observed']}")
+            parts.append(f"    gesagt:   {row['claude_view']}")
+
+        parts += ["", "=== KALIBRIERUNG ===", calibration(log, settings.journal_path)]
+    finally:
+        log.close()
+
+    parts += [
+        "",
+        "=== STEHENDE REGELN ===",
+        "Papier, kein Echtgeld. Kein Orderpfad im Code.",
+        "Einschätzungen bekommen die Quelle claude_read und werden gegen die",
+        "Regel gemessen. Eine Bedingung wird vorher formuliert, nie nachträglich.",
+        "Unter 30 abgeschlossenen Trades gibt es kein Urteil.",
+    ]
+    return "\n".join(parts)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Entscheidungssystem — es platziert keine Orders"
@@ -186,6 +252,39 @@ def main() -> int:
     )
 
     sub.add_parser("open", help="offene Positionen")
+
+    read = sub.add_parser(
+        "read", help="Chart-Einschätzung festhalten (auch als Bedingung)"
+    )
+    read.add_argument("--ref", required=True)
+    read.add_argument("--symbol", default=None)
+    read.add_argument("--timeframe", default="1D")
+    read.add_argument("--observed", required=True, help="was faktisch zu sehen ist")
+    read.add_argument(
+        "--rule", choices=[str(v) for v in RuleVerdict], default=str(RuleVerdict.NOT_DETERMINABLE)
+    )
+    read.add_argument("--view", required=True, help="die Einschätzung in einem Satz")
+    read.add_argument(
+        "--conviction", choices=[str(c) for c in Conviction], default=str(Conviction.MEDIUM)
+    )
+    read.add_argument("--entry", default=None)
+    read.add_argument("--stop", default=None)
+    read.add_argument("--target", default=None)
+    read.add_argument(
+        "--when",
+        default=None,
+        help=(
+            "Bedingung, die zuerst eintreten muss, z. B. "
+            "'naechste Tageskerze schliesst ueber 60000'"
+        ),
+    )
+
+    trigger = sub.add_parser("trigger", help="Bedingung ist eingetreten")
+    trigger.add_argument("--ref", required=True)
+
+    sub.add_parser("armed", help="Einschätzungen, die auf ihre Bedingung warten")
+    sub.add_parser("calibration", help="waren die sicheren Einschätzungen besser?")
+    sub.add_parser("context", help="alles, was eine neue Session wissen muss")
     costs = sub.add_parser(
         "costcheck", help="welche Strategieklassen deine Gebühren überhaupt tragen"
     )
@@ -293,6 +392,72 @@ def main() -> int:
                 print(f"    These           {row['thesis']}")
                 print(f"    Regel           {row['signal_source']}")
                 print()
+            return 0
+
+        if args.command == "read":
+            log = ReadLog(_read_log_path(settings))
+            log.record(
+                ChartRead(
+                    ref=args.ref,
+                    symbol=args.symbol or settings.symbol,
+                    timeframe=args.timeframe,
+                    observed=args.observed,
+                    rule_says=RuleVerdict(args.rule),
+                    claude_view=args.view,
+                    conviction=Conviction(args.conviction),
+                    entry=Decimal(args.entry) if args.entry else None,
+                    stop=Decimal(args.stop) if args.stop else None,
+                    target=Decimal(args.target) if args.target else None,
+                    trigger_condition=args.when,
+                ),
+                now=now,
+            )
+            log.close()
+            if args.when:
+                print(f"Bedingung festgehalten als {args.ref}:")
+                print(f"  {args.when}")
+                print("\nTritt sie ein: `run_gate trigger --ref " + args.ref + "`")
+            else:
+                print(f"Einschätzung festgehalten als {args.ref}.")
+            print("Sie ist ab jetzt nicht mehr änderbar und wird gegen ihr Ergebnis gehalten.")
+            return 0
+
+        if args.command == "trigger":
+            log = ReadLog(_read_log_path(settings))
+            try:
+                log.mark_triggered(args.ref, now=now)
+                print(f"{args.ref}: Bedingung eingetreten.")
+                print("Jetzt `run_gate check` — das Gate entscheidet, ob es trotzdem geht.")
+            except (KeyError, ValueError) as exc:
+                print(str(exc))
+                return 1
+            finally:
+                log.close()
+            return 0
+
+        if args.command == "armed":
+            log = ReadLog(_read_log_path(settings))
+            rows = log.armed()
+            if not rows:
+                print("Keine wartenden Bedingungen.")
+            for row in rows:
+                print(f"{row['ref']}  {row['symbol']} {row['timeframe']}  ({row['conviction']})")
+                print(f"    WENN       {row['trigger_condition']}")
+                print(f"    dann       Einstieg {row['entry'] or '?'}  Stop {row['stop'] or '?'}")
+                print(f"    gesehen    {row['observed']}")
+                print(f"    Regel      {row['rule_says']}")
+                print()
+            log.close()
+            return 0
+
+        if args.command == "calibration":
+            log = ReadLog(_read_log_path(settings))
+            print(calibration(log, settings.journal_path))
+            log.close()
+            return 0
+
+        if args.command == "context":
+            print(_context(settings, journal, ledger, now))
             return 0
 
         if args.command == "review":

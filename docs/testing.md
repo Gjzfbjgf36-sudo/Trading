@@ -12,7 +12,7 @@ make check        # all three
 
 ## Current status
 
-412 tests, all passing. `ruff check` clean. `mypy --strict` clean over
+434 tests, all passing. `ruff check` clean. `mypy --strict` clean over
 `src/arbcore`.
 
 | Area | File | What it pins down |
