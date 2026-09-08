@@ -1,0 +1,23 @@
+{
+  "exported_at": "2026-09-08T17:32:10.314029+00:00",
+  "commitments": [],
+  "chart_reads": [
+    {
+      "id": 1,
+      "ref": "PEPE-2026-09-08",
+      "at": "2026-09-08T17:32:03.782076+00:00",
+      "symbol": "PEPECOIN",
+      "timeframe": "1D",
+      "observed": "Vom Betreiber genannt, nicht von mir gemessen: Kurs 0.1255 EUR, +22 % in 24 Std., ATH 6.99 EUR (Kurs unter 2 % davon), 24h-Volumen ca. 214000 EUR bei 12 Mio EUR Marktkapitalisierung. Keine Kerzenreihe vorhanden, kein Backtest, keine Kraken-CSV.",
+      "rule_says": "NOT_DETERMINABLE",
+      "claude_view": "Ich habe keine Einschaetzung zur Kursrichtung. Belegbar ist nur: ohne Kerzen kann die Regel nicht rechnen, und das Papier misst eine feste Marktliste, in der dieser Coin nicht steht.",
+      "conviction": "LOW",
+      "entry": null,
+      "stop": null,
+      "target": null,
+      "acted": 0,
+      "trigger_condition": null,
+      "triggered_at": null
+    }
+  ]
+}
