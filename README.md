@@ -56,7 +56,7 @@ python -m arbcore.app.run_gate serve --token ...   # optional: TradingView-Webho
 ```
 
 Der tägliche Ablauf auf einer Seite: **[docs/MORGENS.md](docs/MORGENS.md)**.
-Ein Bildschirm mit dem ganzen Stand: `run_gate board --csv records/*.csv`.
+Ein Bildschirm mit dem ganzen Stand: `run_gate board --dir records --html board.html`.
 Anleitung ohne Vorkenntnisse: **[docs/ANLEITUNG.md](docs/ANLEITUNG.md)**.
 Zwei Startregeln für TradingView — **eine** auswählen, nicht beide:
 `strategies/donchian_trend.pine` (Ausbruch, 2 Parameter) oder
@@ -152,6 +152,7 @@ development environment, research mode, live trading off.
 
 | Document | Contents |
 |---|---|
+| [VIELE_MAERKTE.md](docs/VIELE_MAERKTE.md) | Warum ein Scan über 1000 Märkte die Messung ungültig macht — und Aktien |
 | [MORGENS.md](docs/MORGENS.md) | Der tägliche Ablauf: Kurse holen, board, handeln, schließen |
 | [REAL_DATA_REPORT.md](docs/REAL_DATA_REPORT.md) | Erster Lauf gegen echte Kraken-Kurse, und welcher Hebel wirklich wirkt |
 | [architecture.md](docs/architecture.md) | Layering, the risk-engine contract, lifecycle, safety subsystem |

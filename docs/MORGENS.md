@@ -27,8 +27,13 @@ python -m arbcore.app.run_rules import-kraken --json ~/Downloads/sol.json --out 
 ### 3. Der eine Blick
 
 ```bash
-python -m arbcore.app.run_gate board --csv records/*.csv
+python -m arbcore.app.run_gate board --dir records --html board.html
+open board.html
 ```
+
+Ohne `--html` steht dasselbe im Terminal. Die HTML-Datei ist praktischer,
+sobald du mehr als eine Handvoll Märkte hast: sie hat ein Suchfeld und einen
+Schalter "nur feuernde".
 
 Das ist der Bildschirm, auf dem alles steht: Kapital, Drawdown, offene
 Positionen mit Countdown, alle Märkte mit Abstand zum Auslöser — und unten,
@@ -104,6 +109,9 @@ Einzige, was dieses Projekt am Ende wert ist.
 * `config/decide.yaml` anfassen. Die Werte stehen fest, damit die Papier-Phase
   etwas misst. Ein Parameter, den man während der Messung dreht, macht die
   Messung wertlos — nicht besser.
+* Die Marktliste erweitern, weil "mehr Märkte mehr Chancen" heißt. Sie heißen
+  mehr Auswahl, und Auswahl ist genau das, was nie gemessen wurde. Warum, steht
+  in [VIELE_MAERKTE.md](VIELE_MAERKTE.md).
 * Öfter als einmal am Tag nachschauen. Die Regel arbeitet auf Tageskerzen. Was
   zwischendurch passiert, ist für sie nicht vorhanden.
 

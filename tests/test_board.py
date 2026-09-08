@@ -179,3 +179,62 @@ def test_the_one_line_summary_matches_the_screen():
     assert "faellig" in summarise_for_day(
         board(open_positions=(position(opened_days_ago=20),)), today=today
     )
+
+
+# --- the same screen as HTML ---------------------------------------------
+
+
+def test_the_html_shows_the_same_verdict_as_the_terminal():
+    from arbcore.decide.board_html import render_html
+
+    screen = board(markets={"btc": breaking_out()})
+    page = render_html(screen)
+    assert "SIGNAL" in page
+    assert "run_gate check" in page
+    assert 'class="verdict signal"' in page
+
+
+def test_the_html_marks_an_overdue_position_and_drops_the_buy():
+    from arbcore.decide.board_html import render_html
+
+    page = render_html(
+        board(
+            markets={"btc": breaking_out()},
+            open_positions=(position(opened_days_ago=20),),
+        )
+    )
+    assert "ZEIT-STOP ERREICHT" in page
+    assert "run_gate check" not in page
+
+
+def test_the_html_is_self_contained():
+    """It is opened from the Finder, possibly with no network at all."""
+    from arbcore.decide.board_html import render_html
+
+    page = render_html(board())
+    for forbidden in ("<script src", "<link rel=\"stylesheet\"", "fetch(", "//cdn"):
+        assert forbidden not in page
+
+
+def test_the_html_escapes_market_names():
+    """A file name is attacker-adjacent input the moment it comes from a folder."""
+    from arbcore.decide.board_html import render_html
+
+    page = render_html(board(markets={"<script>x</script>": quiet()}))
+    assert "<script>x</script>" not in page.replace("<script>(function", "")
+    assert "&lt;script&gt;" in page
+
+
+def test_the_terminal_caps_the_market_list_but_names_the_total():
+    """Six hundred rows in a terminal is not an interface."""
+    markets = {f"m{i}": quiet() + [bar(60, "104")] for i in range(40)}
+    rendered = board(markets=markets).render()
+    assert "weitere Märkte" in rendered
+    assert rendered.count("wartet") <= 12
+
+
+def test_a_firing_market_is_never_hidden_by_the_cap():
+    markets = {f"m{i}": quiet() + [bar(60, "104"), bar(61, "104")] for i in range(40)}
+    markets["winner"] = breaking_out()
+    rendered = board(markets=markets).render()
+    assert "winner" in rendered

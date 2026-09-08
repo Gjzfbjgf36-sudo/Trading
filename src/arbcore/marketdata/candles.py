@@ -271,3 +271,46 @@ def fetch_ohlcv(
     )
     validate_series(candles)
     return candles
+
+
+def list_symbols(exchange_id: str, quote: str = "USD") -> tuple[str, ...]:
+    """Alle handelbaren Paare einer Börse mit dieser Quote-Währung.
+
+    Über ``ccxt``, aus demselben Grund wie ``fetch_ohlcv``: die Liste der Paare
+    ist eine Integrationstatsache und wird nicht geraten. Inaktive Märkte
+    werden weggelassen — ein Signal auf einem delisteten Paar ist nicht
+    handelbar und würde die Auswertung verwässern.
+    """
+    try:
+        import ccxt
+    except ImportError:
+        raise BadCandleData(
+            "ccxt ist nicht installiert. `pip install ccxt`."
+        ) from None
+    try:
+        exchange_class = getattr(ccxt, exchange_id)
+    except AttributeError:
+        raise BadCandleData(f"ccxt kennt keine Börse namens {exchange_id!r}") from None
+    exchange = exchange_class({"enableRateLimit": True})
+    markets = exchange.load_markets()
+    wanted = quote.upper()
+    return tuple(
+        sorted(
+            symbol
+            for symbol, market in markets.items()
+            if market.get("quote", "").upper() == wanted
+            and market.get("active", True)
+            and market.get("spot", True)
+        )
+    )
+
+
+def symbol_to_filename(symbol: str, timeframe: str) -> str:
+    """``BTC/USD`` und ``1d`` werden zu ``btc_usd_1d.csv``.
+
+    Ein Dateiname darf keinen Schrägstrich enthalten, und der Markt muss aus
+    dem Namen wieder ablesbar sein — der Scanner zeigt später genau diesen
+    Namen an.
+    """
+    safe = symbol.replace("/", "_").replace(":", "_").replace(" ", "")
+    return f"{safe.lower()}_{timeframe}.csv"

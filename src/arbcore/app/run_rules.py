@@ -25,8 +25,10 @@ from ..decide.settings import DEFAULT_PATH, DecideSettings, SettingsError, load_
 from ..marketdata.candles import (
     BadCandleData,
     fetch_ohlcv,
+    list_symbols,
     load_csv,
     load_kraken_json,
+    symbol_to_filename,
     write_csv,
 )
 from ..strategy.rules import AVAILABLE, DonchianBreakout
@@ -113,6 +115,19 @@ def main() -> int:
     fetch.add_argument("--timeframe", default="1d")
     fetch.add_argument("--limit", type=int, default=720)
     fetch.add_argument("--out", default="data/candles.csv")
+
+    many = sub.add_parser(
+        "fetch-many",
+        help="alle Paare einer Börse herunterladen (braucht ccxt und Netz)",
+    )
+    many.add_argument("--exchange", default="kraken")
+    many.add_argument("--quote", default="USD", help="nur Paare gegen diese Währung")
+    many.add_argument("--timeframe", default="1d")
+    many.add_argument("--limit", type=int, default=720)
+    many.add_argument("--out-dir", default="records/markets")
+    many.add_argument(
+        "--max", type=int, default=None, help="höchstens so viele Paare laden"
+    )
 
     kraken = sub.add_parser(
         "import-kraken",
@@ -241,6 +256,51 @@ def main() -> int:
 
     if args.command == "watch":
         return _watch(args, settings)
+
+    if args.command == "fetch-many":
+        try:
+            symbols = list_symbols(args.exchange, args.quote)
+        except BadCandleData as exc:
+            print(str(exc))
+            return 1
+        if args.max is not None:
+            symbols = symbols[: args.max]
+        if not symbols:
+            print(f"Keine aktiven {args.quote}-Paare auf {args.exchange} gefunden.")
+            return 1
+        folder = Path(args.out_dir)
+        folder.mkdir(parents=True, exist_ok=True)
+        print(f"{len(symbols)} Paare auf {args.exchange} gegen {args.quote}.")
+        print("Das dauert: ccxt hält das Ratenlimit der Börse ein.\n")
+        written = 0
+        failed: list[str] = []
+        for number, symbol in enumerate(symbols, start=1):
+            name = symbol_to_filename(symbol, args.timeframe)
+            try:
+                candles = fetch_ohlcv(
+                    args.exchange, symbol, args.timeframe, args.limit
+                )
+            except Exception as exc:  # noqa: BLE001
+                # Ein einzelnes totes Paar darf einen Lauf über hunderte
+                # Märkte nicht abbrechen — es wird genannt und übersprungen.
+                failed.append(f"{symbol}: {type(exc).__name__}: {exc}")
+                continue
+            write_csv(folder / name, candles)
+            written += 1
+            print(f"  [{number}/{len(symbols)}] {symbol}: {len(candles)} Kerzen")
+        print(f"\n{written} Märkte in {folder} geschrieben.")
+        if failed:
+            print(f"{len(failed)} nicht geladen:")
+            for problem in failed[:20]:
+                print(f"  {problem}")
+            if len(failed) > 20:
+                print(f"  ... und {len(failed) - 20} weitere")
+        print(
+            "\nWICHTIG: Viele Märkte gleichzeitig zu scannen ist NICHT dasselbe "
+            "wie\nmehr Beobachtungen derselben Messung. Siehe "
+            "docs/VIELE_MAERKTE.md."
+        )
+        return 0
 
     if args.command == "import-kraken":
         try:

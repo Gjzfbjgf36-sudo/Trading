@@ -27,6 +27,9 @@ from .gate import AccountState
 
 _PCT = Decimal("0.01")
 
+#: So viele Marktzeilen zeigt das Terminal höchstens. Der Browser zeigt alle.
+_TERMINAL_ROWS = 12
+
 
 @dataclass(frozen=True, slots=True)
 class OpenLine:
@@ -91,7 +94,7 @@ class Board:
     def room_for_more(self) -> int:
         return max(0, self.max_open_positions - len(self.open_lines))
 
-    def _verdict(self) -> list[str]:
+    def verdict_lines(self) -> list[str]:
         """Was jetzt zu tun ist. Höchste Dringlichkeit zuerst."""
         if self.stale_markets:
             names = ", ".join(f"{n} ({d} Tage alt)" for n, d in self.stale_markets)
@@ -165,7 +168,12 @@ class Board:
             lines.append(
                 f"    {'Markt':<20}{'Kurs':>12}{'Auslöser':>12}{'Abstand':>10}  Stand"
             )
-            for row in self.scan_rows:
+            shown = [row for row in self.scan_rows if row.status.fires]
+            rest = [row for row in self.scan_rows if not row.status.fires]
+            # Bei vielen Märkten ist eine vollständige Liste im Terminal
+            # unlesbar. Feuernde immer, dann die nächstliegenden.
+            shown += rest[: max(0, _TERMINAL_ROWS - len(shown))]
+            for row in shown:
                 s = row.status
                 if s.warmup_missing > 0:
                     lines.append(f"    {row.market:<20}{'zu wenig Historie':>46}")
@@ -178,8 +186,13 @@ class Board:
                 lines.append(
                     f"    {row.market:<20}{s.price!s:>12}{level:>12}{gap:>10}  {mark}"
                 )
+            hidden = len(self.scan_rows) - len(shown)
+            if hidden > 0:
+                lines.append(
+                    f"    ... {hidden} weitere Märkte, keiner davon feuert."
+                )
         lines.extend(["", "-" * 68, ""])
-        lines.extend(self._verdict())
+        lines.extend(self.verdict_lines())
         lines.extend(["", "-" * 68])
         return "\n".join(lines)
 

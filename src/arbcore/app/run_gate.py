@@ -22,6 +22,7 @@ from pathlib import Path
 
 from ..decide.account import AccountLedger
 from ..decide.board import build_board
+from ..decide.board_html import render_html
 from ..decide.costcheck import report as cost_report
 from ..decide.gate import GateConfig, Signal, SignalGate
 from ..decide.journal import ExitReason, Journal, PlanIncomplete
@@ -260,6 +261,15 @@ def main() -> int:
         "--csv", nargs="*", default=[], help="eine CSV je Markt, wie bei scan"
     )
     board.add_argument("--rule", choices=sorted(AVAILABLE), default="donchian")
+    board.add_argument(
+        "--dir",
+        dest="market_dir",
+        default=None,
+        help="Ordner mit CSV-Dateien; jede Datei ist ein Markt",
+    )
+    board.add_argument(
+        "--html", default=None, help="zusätzlich als HTML-Datei schreiben"
+    )
     sub.add_parser("setup", help="Ist alles eingerichtet? Was ist der nächste Schritt?")
     check = sub.add_parser("check", help="Darf dieser Trade laufen, und wie groß?")
     _add_signal_args(check)
@@ -375,13 +385,31 @@ def main() -> int:
             return 0
 
         if args.command == "board":
+            paths = list(args.csv)
+            if args.market_dir:
+                folder = Path(args.market_dir)
+                if not folder.is_dir():
+                    print(f"{folder} ist kein Ordner.")
+                    return 1
+                paths.extend(str(p) for p in sorted(folder.glob("*.csv")))
+            if not paths:
+                print("Keine Märkte übergeben. --csv oder --dir angeben.")
+                return 1
             markets = {}
-            for path in args.csv:
+            unreadable: list[str] = []
+            for path in paths:
                 try:
                     markets[Path(path).stem] = load_csv(path)
                 except BadCandleData as exc:
-                    print(str(exc))
-                    return 1
+                    # Bei einem Ordner voller Märkte darf eine kaputte Datei
+                    # nicht den ganzen Bildschirm verhindern — aber sie wird
+                    # genannt, nicht verschwiegen.
+                    unreadable.append(f"{Path(path).name}: {exc}")
+            if not markets:
+                print("Kein Markt lesbar:")
+                for problem in unreadable:
+                    print(f"  {problem}")
+                return 1
             screen = build_board(
                 rule=AVAILABLE[args.rule],
                 markets=markets,
@@ -393,6 +421,15 @@ def main() -> int:
                 now=now,
             )
             print(screen.render())
+            if unreadable:
+                print(f"\n  {len(unreadable)} Datei(en) nicht lesbar:")
+                for problem in unreadable:
+                    print(f"    {problem}")
+            if args.html:
+                out = Path(args.html)
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(render_html(screen), encoding="utf-8")
+                print(f"\nHTML geschrieben: {out.resolve()}")
             # Etwas zu tun heisst Exit-Code 0; nichts zu tun heisst 1, damit ein
             # Skript den Unterschied kennt, ohne die Ausgabe zu lesen.
             return 0 if (screen.firing or screen.overdue) else 1
