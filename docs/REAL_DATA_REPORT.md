@@ -193,6 +193,35 @@ keine ehrliche Auswertung:
 **Status: Hypothese, nicht Ergebnis.** Sie gehört in die Papier-Phase, mit
 vorher festgelegtem Wert, und wird dort gemessen — nicht rückwirkend bestätigt.
 
+### Was der festgelegte Wert tatsächlich liefert
+
+`time_stop_bars: 12` steht jetzt in der Konfiguration. Damit ergibt derselbe
+Portfolio-Befehl:
+
+| | ohne Zeit-Stop | mit Zeit-Stop 12 |
+|---|---|---|
+| Trades | 16 | **27** |
+| Netto | −15,81 | **+21,58** |
+| Kombinierter Drawdown | 16,35 | **25,82** |
+| Streuungsvorteil | 51,9 % | **9,5 %** |
+
+Zwei Dinge, die gegen die einfache Erfolgsgeschichte sprechen:
+
+**Der Zeit-Stop frisst die Streuung auf.** Von 51,9 % bleiben 9,5 %. Kurze
+Haltedauern bedeuten, dass alle drei Märkte zu denselben Zeitpunkten im Markt
+sind — Krypto-Ausbrüche passieren nun einmal gleichzeitig. Die Verluste fallen
+dadurch wieder zusammen. Die beiden Verbesserungen aus diesem Report heben sich
+teilweise gegenseitig auf. Unterm Strich: 37 mehr Gewinn gegen 9,5 mehr
+Drawdown — ein guter Tausch, aber eben ein Tausch und kein Geschenk.
+
+**12 liegt in einer Delle.** Zeit-Stop 10 ergibt +38,87, 15 ergibt +38,80 — und
+das dazwischenliegende 12 nur +21,58. Ein echtes Plateau ist glatt; dieses ist
+es nicht. Das ist kein Grund, doch 10 zu nehmen: es ist ein weiterer Beleg
+dafür, dass diese Zahlen auf zu wenigen Trades stehen, um Nachkommastellen
+ernst zu nehmen. Wer aus dieser Delle schließt, 12 sei "schlecht", hat den
+Punkt verkehrt herum verstanden — die Delle sagt etwas über die Datenmenge,
+nicht über den Parameter.
+
 ### Und die 48 verworfenen Signale
 
 Donchian hat 16 Trades gemacht und **48 weitere Signale verworfen**, weil bereits

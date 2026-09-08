@@ -38,6 +38,14 @@ class DecideSettings:
     max_open_positions: int = 3
     #: Minimum reward-to-risk. See GateConfig for why 1.0 is not enough.
     min_reward_to_risk: Decimal = Decimal("1.5")
+    #: Close a position after this many bars regardless of the rule's own exit.
+    #: ``None`` disables it. See docs/REAL_DATA_REPORT.md: the Donchian exit
+    #: waits for a 20-day low and gives most of the move back getting there, and
+    #: a stop of 10-15 bars was positive on all three markets and in both halves
+    #: of the series. It is a pre-registered hypothesis, not a settled result —
+    #: the value is fixed here *before* the paper phase so the phase can measure
+    #: it rather than confirm it afterwards.
+    time_stop_bars: int | None = None
     #: False until you have met every condition in docs/ANLEITUNG.md.
     real_money: bool = False
 
@@ -54,6 +62,11 @@ class DecideSettings:
             )
         if self.min_notional < ZERO:
             raise SettingsError("min_notional must be >= 0")
+        if self.time_stop_bars is not None and self.time_stop_bars < 1:
+            raise SettingsError(
+                f"time_stop_bars of {self.time_stop_bars} would close the position "
+                "before it opens. Leave it unset to disable the time stop."
+            )
         ratio = to_decimal(self.min_reward_to_risk)
         object.__setattr__(self, "min_reward_to_risk", ratio)
         if ratio < Decimal(1):
@@ -73,6 +86,7 @@ class DecideSettings:
             "daily_loss_limit": str(self.risk.daily_loss_limit),
             "max_drawdown": str(self.risk.max_drawdown),
             "min_reward_to_risk": str(self.min_reward_to_risk),
+            "time_stop_bars": str(self.time_stop_bars),
             "real_money": str(self.real_money),
         }
 
@@ -115,6 +129,7 @@ def settings_from_mapping(data: Mapping[str, Any]) -> DecideSettings:
         "daily_loss_limit",
         "max_drawdown",
         "max_position_fraction",
+        "time_stop_bars",
     }
     unknown = set(data) - known
     if unknown:
@@ -142,4 +157,7 @@ def settings_from_mapping(data: Mapping[str, Any]) -> DecideSettings:
         max_open_positions=int(data.get("max_open_positions", 3)),
         min_reward_to_risk=to_decimal(str(data.get("min_reward_to_risk", "1.5"))),
         real_money=bool(data.get("real_money", False)),
+        time_stop_bars=(
+            None if data.get("time_stop_bars") is None else int(data["time_stop_bars"])
+        ),
     )

@@ -117,6 +117,7 @@ def run_portfolio(
     costs: BacktestCosts,
     capital_per_market: Decimal,
     risk_per_trade: Decimal = Decimal("0.01"),
+    time_stop_bars: int | None = None,
 ) -> PortfolioResult:
     """Dieselbe Regel auf jedem Markt, dann chronologisch zusammengeführt.
 
@@ -136,6 +137,7 @@ def run_portfolio(
             costs=costs,
             starting_capital=capital_per_market,
             risk_per_trade=risk_per_trade,
+            time_stop_bars=time_stop_bars,
         )
         per_market.append(
             MarketResult(

@@ -331,6 +331,26 @@ Die Antwort auf „soll ich jetzt verkaufen?" steht dort, seit du eingestiegen
 bist. Sie wird nicht dadurch besser, dass du sie neu überdenkst, während die
 Position im Minus ist.
 
+### Der Zeit-Stop gehört zur Regel, nicht zu deiner Laune
+
+In `config/decide.yaml` steht `time_stop_bars: 12`: Die Position wird nach zwölf
+Kerzen geschlossen, egal wo der Kurs steht. Auch im Plus. Auch wenn es gerade
+gut aussieht.
+
+Der Grund steht in `docs/REAL_DATA_REPORT.md` und ist gemessen, nicht geraten:
+Der Donchian-Ausstieg wartet auf ein 20-Tage-Tief und gibt den Gewinn auf dem
+Weg dorthin größtenteils zurück. Über zwei Jahre und drei Märkte wurde aus
+−15,81 mit Zeit-Stop +21,58.
+
+Der Fehler, den man hier macht, ist immer derselbe: Die zwölf Kerzen sind um,
+die Position steht im Plus, es läuft ja gerade — man lässt sie laufen. Damit
+handelst du nicht mehr die Regel, die gemessen wurde, sondern die Variante, die
+in **beiden** Zeithälften verloren hat. Der Zeit-Stop wirkt genau deshalb, weil
+er auch dann greift, wenn es sich falsch anfühlt.
+
+`run_rules signal` schreibt dir das Datum direkt in die Ausgabe, damit du es
+beim Einstieg in den Plan überträgst und nicht später ausrechnen musst.
+
 **Ausstiegsmeldungen laufen nie durch das Gate.** Das Gate verhindert, dass du
 neues Risiko eingehst — ein Ausstieg *reduziert* Risiko. Eine Prüfung, die
 einen Ausstieg blockieren könnte, wäre eine Prüfung, die dich in einer Position

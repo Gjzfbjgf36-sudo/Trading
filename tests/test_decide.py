@@ -587,3 +587,69 @@ def test_an_empty_journal_compares_nothing(journal):
     from arbcore.review.performance import source_comparison
 
     assert source_comparison(journal) == {}
+
+
+# --- time stop, pre-registered in configuration --------------------------
+
+
+def test_the_time_stop_reaches_the_backtest_from_configuration():
+    """Configuring it and passing it must produce the same run."""
+    from arbcore.backtest.rule_backtest import BacktestCosts, run_backtest
+    from arbcore.decide.settings import settings_from_mapping
+    from arbcore.marketdata.candles import Candle
+    from arbcore.strategy.rules import DonchianBreakout
+
+    settings = settings_from_mapping(
+        {"starting_capital": "1000", "fee_rate": "0.0026", "time_stop_bars": 12}
+    )
+    assert settings.time_stop_bars == 12
+
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    candles = []
+    for i in range(200):
+        price = Decimal(100 + i)
+        candles.append(
+            Candle(
+                at=start + timedelta(days=i),
+                open=price,
+                # High equals the close so a new close is a genuine breakout;
+                # padding the high above it would mean the rule never fires.
+                high=price,
+                low=price * Decimal("0.98"),
+                close=price,
+                volume=Decimal("1"),
+            )
+        )
+    costs = BacktestCosts(fee_rate=settings.fee_rate, slippage=Decimal("0.0005"))
+    configured = run_backtest(
+        DonchianBreakout(),
+        candles,
+        costs=costs,
+        starting_capital=settings.starting_capital,
+        time_stop_bars=settings.time_stop_bars,
+    )
+    without = run_backtest(
+        DonchianBreakout(), candles, costs=costs, starting_capital=Decimal("1000")
+    )
+    # A rising series never triggers the Donchian exit, so the time stop is the
+    # only thing that can close a position. If it did not arrive, both runs
+    # would be identical and the setting would be decorative.
+    assert len(configured.trades) > len(without.trades)
+
+
+def test_an_unset_time_stop_stays_unset():
+    from arbcore.decide.settings import settings_from_mapping
+
+    settings = settings_from_mapping(
+        {"starting_capital": "1000", "fee_rate": "0.0026"}
+    )
+    assert settings.time_stop_bars is None
+
+
+def test_a_time_stop_below_one_bar_is_refused():
+    from arbcore.decide.settings import SettingsError, settings_from_mapping
+
+    with pytest.raises(SettingsError, match="before it opens"):
+        settings_from_mapping(
+            {"starting_capital": "1000", "fee_rate": "0.0026", "time_stop_bars": 0}
+        )

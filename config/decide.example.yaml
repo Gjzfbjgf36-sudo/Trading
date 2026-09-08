@@ -34,6 +34,24 @@ max_open_positions: 3
 # Die übliche Empfehlung von 1.5 bis 2.0 kommt genau daher.
 min_reward_to_risk: "1.5"
 
+# Zeit-Stop: Position nach so vielen Kerzen schliessen, egal wo der Kurs steht.
+# Leer lassen (auskommentieren) schaltet ihn ab.
+#
+# 12 ist VORAB festgelegt, bevor die Papier-Phase beginnt — nicht nachträglich
+# passend gemacht. Die Messung in docs/REAL_DATA_REPORT.md: der Donchian-Ausstieg
+# wartet auf ein 20-Tage-Tief und gibt den Gewinn dabei groesstenteils zurueck.
+# Ein Zeit-Stop von 5 bis 15 Kerzen war auf allen drei Maerkten gleichzeitig
+# positiv, und 10 bis 15 auch in beiden Haelften der Reihe — in einem Markt, der
+# um 80 bis 99 % stieg, und in einem, der um 32 bis 57 % fiel.
+#
+# Warum 12 und nicht 10, obwohl 10 im Test am besten war: der beste Wert eines
+# Durchlaufs ist das Maximum einer Zufallsziehung. Aus einem breiten guten
+# Bereich nimmt man die Mitte. Wer den Bestwert nimmt, waehlt die Ueberanpassung.
+#
+# Das ist eine HYPOTHESE, kein Ergebnis: 27 Trades, Schwelle sind 30. Die
+# Papier-Phase misst sie — sie bestaetigt sie nicht.
+time_stop_bars: 12
+
 # Auf true erst, wenn ALLE vier Bedingungen aus docs/ANLEITUNG.md erfüllt sind.
 # Der Wert ändert keine einzige Prüfung — er wird nur im Journal festgehalten,
 # damit Papier- und Echtgeld-Ergebnisse nie vermischt werden.

@@ -125,7 +125,13 @@ def main() -> int:
     back.add_argument("--csv", required=True)
     back.add_argument("--rule", choices=sorted(AVAILABLE), default="donchian")
     back.add_argument("--slippage", default="0.0005")
-    back.add_argument("--time-stop", dest="time_stop", type=int, default=None)
+    back.add_argument(
+        "--time-stop",
+        dest="time_stop",
+        type=int,
+        default=None,
+        help="überschreibt time_stop_bars aus der Konfiguration",
+    )
 
     signal = sub.add_parser("signal", help="feuert die Regel auf der letzten Kerze?")
     signal.add_argument("--csv", required=True)
@@ -215,6 +221,7 @@ def main() -> int:
             ),
             capital_per_market=settings.starting_capital / Decimal(len(markets)),
             risk_per_trade=settings.risk.risk_per_trade,
+            time_stop_bars=settings.time_stop_bars,
         )
         print(portfolio_result.render())
         return 0
@@ -278,6 +285,17 @@ def main() -> int:
             print(f"  Einstieg {current.entry}")
             print(f"  Stop     {current.stop}")
             print(f"  Ziel     {current.target or 'keins (Ausstieg per Regel)'}")
+            if settings.time_stop_bars is not None:
+                # Der Zeit-Stop ist keine Empfehlung, sondern Teil der Regel, die
+                # gemessen wurde. Wer ihn im Eifer weglässt, handelt die Variante,
+                # die in beiden Zeithälften verloren hat.
+                latest = candles[-1].at + _bar_duration(
+                    "1d"
+                ) * settings.time_stop_bars
+                print(
+                    f"  Zeit-Stop nach {settings.time_stop_bars} Kerzen: "
+                    f"spätestens {latest.date()} schliessen, egal wo der Kurs steht"
+                )
             print("\nJetzt `run_gate check` — das Gate entscheidet über die Größe.")
         return 0 if current.fires else 1
 
@@ -288,7 +306,9 @@ def main() -> int:
         costs=costs,
         starting_capital=settings.starting_capital,
         risk_per_trade=settings.risk.risk_per_trade,
-        time_stop_bars=args.time_stop,
+        time_stop_bars=(
+            args.time_stop if args.time_stop is not None else settings.time_stop_bars
+        ),
     )
     fee_pct = (costs.fee_rate * Decimal(100)).quantize(Decimal("0.001"))
     slip_pct = (costs.slippage * Decimal(100)).quantize(Decimal("0.001"))
