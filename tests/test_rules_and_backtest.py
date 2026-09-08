@@ -102,6 +102,90 @@ def test_a_missing_file_is_reported(tmp_path):
         load_csv(tmp_path / "nope.csv")
 
 
+# --- Kraken's own JSON, saved from a browser -----------------------------
+
+
+def _kraken_rows(count: int, start: int = 1_700_000_000) -> list[list[object]]:
+    return [
+        [start + i * 86400, "100.0", "101.0", "99.0", "100.5", "100.2", "7.5", 42]
+        for i in range(count)
+    ]
+
+
+def _write_kraken(path: Path, document: object) -> Path:
+    import json
+
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
+def test_kraken_json_loads_with_volume_from_the_right_column(tmp_path):
+    from arbcore.marketdata.candles import load_kraken_json
+
+    path = _write_kraken(
+        tmp_path / "ohlc.json", {"error": [], "result": {"XXBTZUSD": _kraken_rows(3)}}
+    )
+    candles = load_kraken_json(path)
+    assert len(candles) == 3
+    # Column 5 is the VWAP and column 6 the volume; taking the wrong one is
+    # silent, so it is pinned here.
+    assert candles[0].volume == Decimal("7.5")
+    assert candles[0].close == Decimal("100.5")
+
+
+def test_kraken_json_drops_the_candle_that_has_not_closed(tmp_path):
+    from arbcore.marketdata.candles import load_kraken_json
+
+    rows = _kraken_rows(5)
+    path = _write_kraken(
+        tmp_path / "ohlc.json",
+        {"error": [], "result": {"XXBTZUSD": rows, "last": rows[-2][0]}},
+    )
+    assert len(load_kraken_json(path)) == 4
+
+
+def test_kraken_json_refuses_an_answer_that_is_only_unfinished(tmp_path):
+    from arbcore.marketdata.candles import load_kraken_json
+
+    rows = _kraken_rows(2)
+    path = _write_kraken(
+        tmp_path / "ohlc.json",
+        {"error": [], "result": {"XXBTZUSD": rows, "last": rows[0][0] - 1}},
+    )
+    with pytest.raises(BadCandleData, match="nothing committed"):
+        load_kraken_json(path)
+
+
+def test_kraken_json_passes_the_exchange_error_through(tmp_path):
+    from arbcore.marketdata.candles import load_kraken_json
+
+    path = _write_kraken(
+        tmp_path / "ohlc.json", {"error": ["EQuery:Unknown asset pair"], "result": {}}
+    )
+    with pytest.raises(BadCandleData, match="Unknown asset pair"):
+        load_kraken_json(path)
+
+
+def test_kraken_json_refuses_two_pairs_in_one_answer(tmp_path):
+    from arbcore.marketdata.candles import load_kraken_json
+
+    path = _write_kraken(
+        tmp_path / "ohlc.json",
+        {"error": [], "result": {"XXBTZUSD": _kraken_rows(3), "XETHZUSD": _kraken_rows(3)}},
+    )
+    with pytest.raises(BadCandleData, match="one pair per request"):
+        load_kraken_json(path)
+
+
+def test_kraken_json_rejects_something_that_is_not_the_expected_answer(tmp_path):
+    from arbcore.marketdata.candles import load_kraken_json
+
+    path = tmp_path / "page.json"
+    path.write_text("<html>Access denied</html>", encoding="utf-8")
+    with pytest.raises(BadCandleData, match="not readable JSON"):
+        load_kraken_json(path)
+
+
 # --- indicators ----------------------------------------------------------
 
 

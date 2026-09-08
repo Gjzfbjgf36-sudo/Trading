@@ -14,6 +14,7 @@ current in a way a hard-coded string cannot.
 from __future__ import annotations
 
 import csv
+import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -131,6 +132,78 @@ def _parse_time(raw: str) -> datetime:
         seconds = value / 1000 if value > 10**11 else value
         return datetime.fromtimestamp(seconds, tz=UTC)
     return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
+def load_kraken_json(path: str | Path) -> tuple[Candle, ...]:
+    """Read Kraken's public OHLC response, saved from a browser.
+
+    This is the path for a machine whose terminal cannot reach the exchange
+    while its browser can — which is not an exotic case: corporate networks,
+    filtered DNS and blocked egress all produce it. The operator opens the URL,
+    saves the answer, and the file is worth exactly as much as a download.
+
+    Kraken's ``last`` field marks how far the data is committed. The candle
+    after it is the period still in progress: its high, low and close keep
+    moving. It is dropped, because a rule that fires on a bar that has not
+    closed yet is measuring something that never existed.
+    """
+    file = Path(path)
+    if not file.exists():
+        raise BadCandleData(f"{path} does not exist")
+    try:
+        payload = json.loads(file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise BadCandleData(f"{path} is not readable JSON: {exc}") from None
+    if not isinstance(payload, dict):
+        raise BadCandleData(f"{path}: expected a JSON object at the top level")
+    reported = payload.get("error")
+    if reported:
+        raise BadCandleData(f"Kraken reported an error: {reported}")
+    result = payload.get("result")
+    if not isinstance(result, dict):
+        raise BadCandleData(f"{path}: no 'result' object — is this a Kraken OHLC answer?")
+    series = [v for k, v in result.items() if k != "last" and isinstance(v, list)]
+    if not series:
+        raise BadCandleData(f"{path}: no candle series in the answer")
+    if len(series) > 1:
+        raise BadCandleData(
+            f"{path}: {len(series)} pairs in one answer; ask for one pair per request"
+        )
+    rows = series[0]
+    committed = result.get("last")
+    if isinstance(committed, int) and not isinstance(committed, bool):
+        rows = [row for row in rows if _kraken_time(row) <= committed]
+    if not rows:
+        raise BadCandleData(f"{path}: only unfinished candles — nothing committed to measure")
+    # Kraken: [time, open, high, low, close, vwap, volume, count]
+    candles = []
+    for number, row in enumerate(rows, start=1):
+        if not isinstance(row, list) or len(row) < 7:
+            raise BadCandleData(f"{path} candle {number}: unexpected shape {row!r}")
+        try:
+            candles.append(
+                Candle(
+                    at=datetime.fromtimestamp(_kraken_time(row), tz=UTC),
+                    open=to_decimal(str(row[1])),
+                    high=to_decimal(str(row[2])),
+                    low=to_decimal(str(row[3])),
+                    close=to_decimal(str(row[4])),
+                    volume=to_decimal(str(row[6])),
+                )
+            )
+        except (BadCandleData, InvalidOperation, ValueError, TypeError) as exc:
+            raise BadCandleData(f"{path} candle {number}: {exc}") from None
+    validate_series(candles)
+    return tuple(candles)
+
+
+def _kraken_time(row: object) -> int:
+    if not isinstance(row, list) or not row:
+        raise BadCandleData(f"unexpected candle shape {row!r}")
+    try:
+        return int(row[0])
+    except (TypeError, ValueError):
+        raise BadCandleData(f"unusable timestamp {row[0]!r}") from None
 
 
 def write_csv(path: str | Path, candles: Iterable[Candle]) -> int:

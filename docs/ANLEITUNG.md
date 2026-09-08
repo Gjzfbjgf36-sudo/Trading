@@ -137,6 +137,29 @@ python -m arbcore.app.run_rules signal   --csv data/btc.csv --rule donchian
 
 Der Download passiert einmal; danach läuft alles offline aus der CSV.
 
+### Wenn das Terminal nicht ins Netz kommt, der Browser aber schon
+
+Das ist kein Sonderfall — Firmennetze, gefilterte DNS und gesperrte Ausgänge
+erzeugen genau das. Dann holst du die Kurse mit dem Browser:
+
+1. Diese Adresse öffnen (Paar und Intervall nach Bedarf ändern):
+   `https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1440`
+2. Die Antwort als Datei speichern, zum Beispiel `~/Downloads/btc.json`.
+3. Umwandeln:
+
+```bash
+python -m arbcore.app.run_rules import-kraken --json ~/Downloads/btc.json --out data/btc.csv
+```
+
+Ab hier ist die CSV genauso gut wie eine heruntergeladene. `import-kraken`
+verwirft die noch laufende Kerze — Kraken sagt im Feld `last`, bis wohin die
+Daten abgeschlossen sind, und die Kerze danach ändert sich bis Periodenende
+noch. Eine Regel, die darauf feuert, misst eine Kerze, die es so nie gab.
+
+Andere Paare: `ETHUSD`, `SOLUSD`, `XRPUSD`. Intervall in Minuten: `60`
+(stündlich), `240` (4h), `1440` (täglich). Kraken gibt pro Anfrage höchstens
+720 abgeschlossene Kerzen heraus.
+
 **Dieser Backtest rechnet ehrlicher als der Standard in TradingView**, weil
 deine Gebühren und Slippage Pflichtargumente sind statt Voreinstellungen auf
 null. Drei Entscheidungen sind bewusst gegen uns getroffen:

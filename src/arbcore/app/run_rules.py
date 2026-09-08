@@ -22,7 +22,13 @@ from ..backtest.portfolio import run_portfolio
 from ..backtest.robustness import sweep
 from ..backtest.rule_backtest import BacktestCosts, run_backtest
 from ..decide.settings import DEFAULT_PATH, DecideSettings, SettingsError, load_settings
-from ..marketdata.candles import BadCandleData, fetch_ohlcv, load_csv, write_csv
+from ..marketdata.candles import (
+    BadCandleData,
+    fetch_ohlcv,
+    load_csv,
+    load_kraken_json,
+    write_csv,
+)
 from ..strategy.rules import AVAILABLE, DonchianBreakout
 from ..strategy.watch import status
 
@@ -107,6 +113,13 @@ def main() -> int:
     fetch.add_argument("--timeframe", default="1d")
     fetch.add_argument("--limit", type=int, default=720)
     fetch.add_argument("--out", default="data/candles.csv")
+
+    kraken = sub.add_parser(
+        "import-kraken",
+        help="im Browser gespeicherte Kraken-Antwort in eine CSV umwandeln",
+    )
+    kraken.add_argument("--json", required=True, dest="json_path")
+    kraken.add_argument("--out", required=True)
 
     back = sub.add_parser("backtest", help="Regel über die Kerzen laufen lassen")
     back.add_argument("--csv", required=True)
@@ -200,6 +213,18 @@ def main() -> int:
 
     if args.command == "watch":
         return _watch(args, settings)
+
+    if args.command == "import-kraken":
+        try:
+            candles = load_kraken_json(args.json_path)
+        except BadCandleData as exc:
+            print(str(exc))
+            return 1
+        written = write_csv(args.out, candles)
+        print(f"{written} abgeschlossene Kerzen nach {args.out} geschrieben.")
+        print(f"Zeitraum: {candles[0].at.date()} bis {candles[-1].at.date()}")
+        print("Eine noch laufende Kerze wurde verworfen, falls Kraken eine mitgeliefert hat.")
+        return 0
 
     if args.command == "fetch":
         try:
