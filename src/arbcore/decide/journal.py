@@ -277,6 +277,36 @@ class Journal:
         ).fetchall()
         return sum((Decimal(r["pnl"]) for r in row), start=ZERO)
 
-    def export(self) -> str:
+    def export_rows(self) -> list[dict[str, object]]:
         rows = self.conn.execute("SELECT * FROM commitments ORDER BY id").fetchall()
-        return json.dumps([{k: r[k] for k in r.keys()} for r in rows], indent=2)
+        return [{k: r[k] for k in r.keys()} for r in rows]
+
+    def export(self) -> str:
+        return json.dumps(self.export_rows(), indent=2)
+
+    def import_rows(self, rows: list[dict[str, object]]) -> tuple[int, int]:
+        """Restore commitments from an export. Returns (imported, skipped).
+
+        Existing refs are skipped rather than overwritten. An import must never
+        be able to rewrite a plan or an outcome — that is the one guarantee the
+        whole journal rests on, and a restore is not an exception to it.
+        """
+        columns = [
+            "ref", "opened_at", "symbol", "side", "entry", "stop", "target",
+            "quantity", "risk_amount", "thesis", "invalidation", "signal_source",
+            "paper", "closed_at", "exit_price", "pnl", "exit_reason", "followed_plan",
+        ]
+        imported = skipped = 0
+        for row in rows:
+            values = [row.get(name) for name in columns]
+            try:
+                self.conn.execute(
+                    f"INSERT INTO commitments({', '.join(columns)})"
+                    f" VALUES ({', '.join('?' * len(columns))})",
+                    values,
+                )
+                imported += 1
+            except sqlite3.IntegrityError:
+                skipped += 1
+        self.conn.commit()
+        return imported, skipped

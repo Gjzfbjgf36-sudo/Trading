@@ -389,6 +389,37 @@ python -m arbcore.app.run_gate pending
 
 ---
 
+---
+
+## Wichtig: dein Journal sichern
+
+`journal/` ist git-ignoriert und liegt nur auf dem Rechner, auf dem du
+arbeitest. Wenn du über Claude Code im Browser arbeitest, ist der Container
+**flüchtig** — nach der Session ist alles weg. Drei Monate Aufzeichnung wären
+verloren.
+
+Nach jedem Trade:
+
+```bash
+python -m arbcore.app.run_gate export
+```
+
+Das schreibt `records/journal-export.json`. **Diese Datei gehört ins
+Repository** — sie ist nicht ignoriert und überlebt jeden Rechnerwechsel.
+
+Wiederherstellen:
+
+```bash
+python -m arbcore.app.run_gate import
+```
+
+Vorhandene Einträge werden dabei **übersprungen, nie überschrieben**. Ein
+Restore kann keinen Plan und kein Ergebnis nachträglich umschreiben — das ist
+die eine Garantie, auf der das ganze Journal steht, und ein Wiederherstellen ist
+davon keine Ausnahme.
+
+---
+
 ## Wann du an echtes Geld denken darfst
 
 Alle vier Punkte müssen erfüllt sein:

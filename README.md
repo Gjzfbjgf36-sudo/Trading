@@ -116,7 +116,7 @@ favourable probabilities; an unmonitored condition is not a healthy one.
 
 ```bash
 make install
-make check      # ruff + mypy --strict + pytest (434 tests)
+make check      # ruff + mypy --strict + pytest (437 tests)
 
 # The honest scenario: retail fees, calm spreads
 python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario realistic

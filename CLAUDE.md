@@ -90,6 +90,13 @@ bei jeder Nachricht neu belehren.
 Deutsch für Ausgaben an den Betreiber und für die Anleitung. Code, Bezeichner
 und Prüfnamen bleiben Englisch.
 
+## Sicherung
+
+`journal/` ist git-ignoriert und der Container ist flüchtig. Nach jeder
+Aufzeichnung `run_gate export` ausführen und `records/journal-export.json`
+mitcommitten — sonst verliert der Betreiber seine Historie beim nächsten
+Rechnerwechsel.
+
 ## Prüfen vor jedem Commit
 
 ```bash

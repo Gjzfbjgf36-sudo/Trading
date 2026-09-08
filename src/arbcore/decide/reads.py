@@ -260,6 +260,33 @@ class ReadLog:
         return int(row["total"]), int(row["acted"]), int(row["armed"]), int(row["triggered"])
 
 
+def export_reads(log: ReadLog) -> list[dict[str, object]]:
+    rows = log.conn.execute("SELECT * FROM chart_reads ORDER BY id").fetchall()
+    return [{k: r[k] for k in r.keys()} for r in rows]
+
+
+def import_reads(log: ReadLog, rows: list[dict[str, object]]) -> tuple[int, int]:
+    """Restore reads. Existing refs are skipped, never overwritten."""
+    columns = [
+        "ref", "at", "symbol", "timeframe", "observed", "rule_says", "claude_view",
+        "conviction", "entry", "stop", "target", "acted", "trigger_condition",
+        "triggered_at",
+    ]
+    imported = skipped = 0
+    for row in rows:
+        try:
+            log.conn.execute(
+                f"INSERT INTO chart_reads({', '.join(columns)})"
+                f" VALUES ({', '.join('?' * len(columns))})",
+                [row.get(name) for name in columns],
+            )
+            imported += 1
+        except sqlite3.IntegrityError:
+            skipped += 1
+    log.conn.commit()
+    return imported, skipped
+
+
 def calibration(log: ReadLog, journal_path: str | Path) -> str:
     """Were the confident reads better than the hesitant ones?
 

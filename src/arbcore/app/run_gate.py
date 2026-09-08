@@ -15,6 +15,7 @@ verfälschen, ohne dass es auffällt.
 from __future__ import annotations
 
 import argparse
+import json
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -23,7 +24,15 @@ from ..decide.account import AccountLedger
 from ..decide.costcheck import report as cost_report
 from ..decide.gate import GateConfig, Signal, SignalGate
 from ..decide.journal import ExitReason, Journal, PlanIncomplete
-from ..decide.reads import ChartRead, Conviction, ReadLog, RuleVerdict, calibration
+from ..decide.reads import (
+    ChartRead,
+    Conviction,
+    ReadLog,
+    RuleVerdict,
+    calibration,
+    export_reads,
+    import_reads,
+)
 from ..decide.settings import DEFAULT_PATH, DecideSettings, SettingsError, load_settings
 from ..decide.setup_check import report as setup_report
 from ..decide.webhook import SignalQueue, make_server
@@ -163,6 +172,12 @@ def serve(settings: DecideSettings, journal: Journal, args: argparse.Namespace) 
     return 0
 
 
+#: Backups live outside the git-ignored journal directory, because their whole
+#: purpose is to be committed. A record that vanishes with the machine is not a
+#: record.
+DEFAULT_EXPORT = "records/journal-export.json"
+
+
 def _read_log_path(settings: DecideSettings) -> str:
     """The read log lives beside the journal; they are one record in two files."""
     return str(Path(settings.journal_path).with_name("chart_reads.sqlite"))
@@ -284,6 +299,13 @@ def main() -> int:
 
     sub.add_parser("armed", help="Einschätzungen, die auf ihre Bedingung warten")
     sub.add_parser("calibration", help="waren die sicheren Einschätzungen besser?")
+
+    export = sub.add_parser(
+        "export", help="Journal und Einschätzungen in eine Datei sichern"
+    )
+    export.add_argument("--to", dest="to_path", default=DEFAULT_EXPORT)
+    restore = sub.add_parser("import", help="Sicherung wieder einlesen")
+    restore.add_argument("--from", dest="from_path", default=DEFAULT_EXPORT)
     sub.add_parser("context", help="alles, was eine neue Session wissen muss")
     costs = sub.add_parser(
         "costcheck", help="welche Strategieklassen deine Gebühren überhaupt tragen"
@@ -454,6 +476,40 @@ def main() -> int:
             log = ReadLog(_read_log_path(settings))
             print(calibration(log, settings.journal_path))
             log.close()
+            return 0
+
+        if args.command == "export":
+            log = ReadLog(_read_log_path(settings))
+            snapshot = {
+                "exported_at": now.isoformat(),
+                "commitments": journal.export_rows(),
+                "chart_reads": export_reads(log),
+            }
+            log.close()
+            export_path = Path(args.to_path)
+            export_path.parent.mkdir(parents=True, exist_ok=True)
+            export_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
+            print(
+                f"{len(snapshot['commitments'])} Trades und "
+                f"{len(snapshot['chart_reads'])} Einschätzungen gesichert nach {export_path}."
+            )
+            print("Diese Datei gehört ins Repository — sie überlebt jeden Rechnerwechsel.")
+            return 0
+
+        if args.command == "import":
+            import_path = Path(args.from_path)
+            if not import_path.exists():
+                print(f"{import_path} existiert nicht.")
+                return 1
+            restored = json.loads(import_path.read_text(encoding="utf-8"))
+            imported, skipped = journal.import_rows(restored.get("commitments", []))
+            log = ReadLog(_read_log_path(settings))
+            r_imported, r_skipped = import_reads(log, restored.get("chart_reads", []))
+            log.close()
+            print(f"Trades:         {imported} eingelesen, {skipped} bereits vorhanden")
+            print(f"Einschätzungen: {r_imported} eingelesen, {r_skipped} bereits vorhanden")
+            if skipped or r_skipped:
+                print("\nVorhandene Einträge wurden übersprungen, nie überschrieben.")
             return 0
 
         if args.command == "context":

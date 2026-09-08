@@ -205,3 +205,80 @@ def test_concrete_conditions_are_accepted(condition):
 def test_conditions_that_could_be_argued_afterwards_are_refused(condition):
     with pytest.raises(ValueError, match="observable"):
         a_read(trigger_condition=condition)
+
+
+# --- backup and restore --------------------------------------------------
+
+
+def test_a_journal_survives_being_deleted(tmp_path):
+    """The container is ephemeral; a record that dies with it is not a record."""
+    from arbcore.decide.journal import Journal
+
+    original = Journal(tmp_path / "j.sqlite")
+    original.commit_plan(
+        Commitment(
+            ref="T-1",
+            symbol="BTCUSD",
+            side=Side.BUY,
+            entry=Decimal("60000"),
+            stop=Decimal("57000"),
+            quantity=Decimal("0.003"),
+            risk_amount=Decimal("10"),
+            thesis="Ausbruch ueber das 55-Tage-Hoch, Trend intakt",
+            invalidation="Schlusskurs unter dem 20-Tage-Tief beendet die These",
+            signal_source="donchian_55_20",
+        ),
+        now=NOW,
+    )
+    rows = original.export_rows()
+    original.close()
+
+    restored = Journal(tmp_path / "fresh.sqlite")
+    imported, skipped = restored.import_rows(rows)
+    assert (imported, skipped) == (1, 0)
+    assert restored.open_positions()[0]["ref"] == "T-1"
+    restored.close()
+
+
+def test_restoring_twice_never_overwrites(tmp_path):
+    """A restore must not be able to rewrite a plan or an outcome."""
+    from arbcore.decide.journal import Journal
+
+    journal = Journal(tmp_path / "j.sqlite")
+    journal.commit_plan(
+        Commitment(
+            ref="T-1",
+            symbol="BTCUSD",
+            side=Side.BUY,
+            entry=Decimal("60000"),
+            stop=Decimal("57000"),
+            quantity=Decimal("0.003"),
+            risk_amount=Decimal("10"),
+            thesis="Ausbruch ueber das 55-Tage-Hoch, Trend intakt",
+            invalidation="Schlusskurs unter dem 20-Tage-Tief beendet die These",
+            signal_source="donchian_55_20",
+        ),
+        now=NOW,
+    )
+    rows = journal.export_rows()
+    tampered = [dict(rows[0], thesis="etwas ganz anderes, nachtraeglich geschrieben")]
+    imported, skipped = journal.import_rows(tampered)
+    assert (imported, skipped) == (0, 1)
+    assert journal.open_positions()[0]["thesis"].startswith("Ausbruch")
+    journal.close()
+
+
+def test_reads_survive_the_same_way(log, tmp_path):
+    from arbcore.decide.reads import export_reads, import_reads
+
+    log.record(a_read("R-1", trigger_condition=CONDITION), now=NOW)
+    log.mark_triggered("R-1", now=NOW)
+    rows = export_reads(log)
+
+    fresh = ReadLog(tmp_path / "fresh.sqlite")
+    imported, skipped = import_reads(fresh, rows)
+    assert (imported, skipped) == (1, 0)
+    # The triggered state comes back too, not just the text.
+    assert fresh.armed() == ()
+    assert fresh.counts() == (1, 0, 1, 1)
+    fresh.close()
