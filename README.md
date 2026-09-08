@@ -48,7 +48,8 @@ Es prüft ein Signal aus einer Regel, die du selbst geschrieben und backgetestet
 hast, sagt dir ob und wie groß — und hält fest, was du vorher behauptet hast.
 
 ```bash
-cp config/decide.example.yaml config/decide.yaml   # einmalig, eigene Zahlen eintragen
+./setup-mac.sh                                     # einmalig (macOS/Linux)
+source .venv/bin/activate                          # in jedem neuen Terminal
 python -m arbcore.app.run_gate setup               # was fehlt, und was der nächste Schritt ist
 python -m arbcore.app.run_gate wizard              # geführt: prüfen und Plan festhalten
 python -m arbcore.app.run_gate serve --token ...   # optional: TradingView-Webhook

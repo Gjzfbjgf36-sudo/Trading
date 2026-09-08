@@ -34,11 +34,28 @@ Du brauchst **kein Börsenkonto**. Nur:
 - einen TradingView-Account (kostenloser Tarif genügt)
 - dieses Repository
 
-### Einmalig einrichten
+### Einmalig einrichten (macOS)
 
 ```bash
-cp config/decide.example.yaml config/decide.yaml
+git clone https://github.com/Gjzfbjgf36-sudo/Trading.git
+cd Trading
+./setup-mac.sh
 ```
+
+Danach in **jedem neuen Terminal** zuerst:
+
+```bash
+cd ~/Trading           # oder wohin du geklont hast
+source .venv/bin/activate
+```
+
+> **Warum das nötig ist:** Auf dem Mac heisst der Befehl `python3`, nicht
+> `python` — deshalb sagt das Terminal „command not found: python". Und
+> `pip install` ohne venv scheitert, weil man ins System-Python nichts
+> hineininstallieren soll. Ein venv ist ein eigener Ordner, in dem `python` und
+> `pip` existieren; `source .venv/bin/activate` schaltet ihn ein.
+
+Dann `config/decide.yaml` öffnen und deinen echten Gebührensatz eintragen.
 
 Dann `config/decide.yaml` öffnen und drei Zahlen eintragen: dein gedachtes
 Startkapital, den Gebührensatz deiner Börse **als Bruchteil** (0,26 % sind
