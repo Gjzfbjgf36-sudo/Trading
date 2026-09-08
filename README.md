@@ -111,12 +111,15 @@ favourable probabilities; an unmonitored condition is not a healthy one.
 | Webhook receiver | `src/arbcore/decide/webhook.py` | TradingView alerts; queues verdicts, never files a plan for you |
 | Affordability | `src/arbcore/decide/costcheck.py` | Which strategy classes your fee rate can support at all |
 | Chart reads | `src/arbcore/decide/reads.py` | Assessments and armed conditions, recorded before the fact and scored after |
+| Candles | `src/arbcore/marketdata/candles.py` | Validated OHLC from CSV or a public endpoint via ccxt |
+| Rules in Python | `src/arbcore/strategy/rules.py` | The same logic as the Pine scripts, without a charting service |
+| Honest backtest | `src/arbcore/backtest/rule_backtest.py` | Costs are required; stop assumed before target within a bar |
 
 ## Quick start
 
 ```bash
 make install
-make check      # ruff + mypy --strict + pytest (437 tests)
+make check      # ruff + mypy --strict + pytest (463 tests)
 
 # The honest scenario: retail fees, calm spreads
 python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario realistic

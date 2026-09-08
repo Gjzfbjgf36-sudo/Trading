@@ -105,6 +105,37 @@ die du testest.** Wenn es mehr als drei bis vier werden, glaub dem Ergebnis nich
 
 ---
 
+---
+
+## Ohne TradingView: die Regel läuft auch in Python
+
+Falls du unabhängig sein willst — kein Tarif, keine Grenzen, kein Dritter:
+
+```bash
+pip install ccxt                                     # einmalig
+python -m arbcore.app.run_rules fetch --exchange kraken --symbol BTC/USD --out data/btc.csv
+python -m arbcore.app.run_rules backtest --csv data/btc.csv --rule donchian
+python -m arbcore.app.run_rules signal   --csv data/btc.csv --rule donchian
+```
+
+Der Download passiert einmal; danach läuft alles offline aus der CSV.
+
+**Dieser Backtest rechnet ehrlicher als der Standard in TradingView**, weil
+deine Gebühren und Slippage Pflichtargumente sind statt Voreinstellungen auf
+null. Drei Entscheidungen sind bewusst gegen uns getroffen:
+
+- **Kein Look-ahead.** Ein Signal sieht nur Kerzen bis einschliesslich der
+  Signalkerze.
+- **Stop vor Ziel innerhalb einer Kerze.** Deckt eine Kerze beides ab, kann man
+  aus OHLC nicht sagen, was zuerst kam — also wird der Stop angenommen. Das Ziel
+  anzunehmen würde genau die mehrdeutigen Fälle schönrechnen.
+- **Gebühren auf beiden Seiten**, plus Slippage bei Ein- und Ausstieg.
+
+Feuert die Regel, gibst du Einstieg und Stop ins Gate — der Ablauf bleibt
+derselbe.
+
+---
+
 ## Schritt 2 — Signal prüfen lassen
 
 Am einfachsten geführt — das System fragt dich der Reihe nach alles ab:

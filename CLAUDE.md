@@ -24,6 +24,9 @@ Eine Forschungs- und Risikoplattform, kein Handelssystem. Zwei Teile:
   Strategien, gegen synthetische Märkte gemessen. Ergebnisse in
   `docs/PAPER_RUN_REPORT.md` und `docs/DEX_RUN_REPORT.md`. Beide Strategien
   wurden untersucht und ehrlich verworfen.
+* **Regeln und Backtest** (`arbcore.app.run_rules`): Donchian und Engulfing in
+  Python, gegen echte Kerzen aus CSV oder ccxt. Kosten sind Pflichtargumente;
+  innerhalb einer Kerze wird der Stop vor dem Ziel angenommen.
 * **Entscheidungssystem** (`arbcore.app.run_gate`): prüft Signale gegen
   Risikogrenzen, hält Pläne fest, misst Ergebnisse. **Kein Orderpfad im Code.**
 

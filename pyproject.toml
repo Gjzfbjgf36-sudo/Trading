@@ -37,3 +37,10 @@ select = ["E", "F", "I", "B", "UP"]
 python_version = "3.11"
 strict = true
 files = ["src/arbcore"]
+
+# ccxt is an optional dependency: the system evaluates rules from CSV without
+# it, and only the live download needs it. Absent stubs must not fail the type
+# check for everyone who never installs it.
+[[tool.mypy.overrides]]
+module = "ccxt.*"
+ignore_missing_imports = true
