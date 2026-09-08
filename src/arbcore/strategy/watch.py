@@ -14,7 +14,7 @@ ist.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -160,3 +160,75 @@ def status(
         now=now,
         warmup_missing=missing,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class ScanRow:
+    """Eine Zeile im Scanner: ein Markt, sein Stand zur Regel."""
+
+    market: str
+    status: WatchStatus
+
+    @property
+    def sort_key(self) -> tuple[int, Decimal]:
+        """Feuernde zuerst, dann nach Abstand zum Auslöser.
+
+        Märkte ohne Schwellenwert landen hinten statt vorne — unbekannter
+        Abstand ist kein kleiner Abstand.
+        """
+        if self.status.fires:
+            return (0, ZERO)
+        distance = self.status.distance
+        if distance is None:
+            return (2, ZERO)
+        return (1, distance)
+
+
+def scan(
+    rule: Rule,
+    markets: Mapping[str, Sequence[Candle]],
+    *,
+    now: datetime,
+    bar_duration: timedelta = timedelta(days=1),
+) -> tuple[ScanRow, ...]:
+    """Dieselbe Regel über viele Märkte, sortiert nach Nähe zum Auslöser.
+
+    Der Scanner sucht *nicht* den stärksten Aufwärtstrend heraus. Er wendet
+    genau die Regel an, die gemessen wurde, auf jeden Markt einzeln. Das ist
+    der Unterschied zwischen "mehr Beobachtungen derselben Sache" und "sich aus
+    vielen Märkten das schönste Bild aussuchen" — Letzteres fügt eine Auswahl
+    hinzu, die nie getestet wurde, und ist der übliche Weg, einen gemessenen
+    Vorteil wieder zu verlieren.
+    """
+    rows = [
+        ScanRow(market=name, status=status(rule, candles, now=now, bar_duration=bar_duration))
+        for name, candles in markets.items()
+    ]
+    return tuple(sorted(rows, key=lambda row: (row.sort_key, row.market)))
+
+
+def render_scan(rows: Sequence[ScanRow]) -> str:
+    """Tabelle für das Terminal."""
+    if not rows:
+        return "Keine Märkte übergeben."
+    lines = [f"{'Markt':<12} {'Kurs':>12} {'Auslöser':>12} {'Abstand':>10}  Stand"]
+    lines.append("-" * 72)
+    for row in rows:
+        s = row.status
+        if s.warmup_missing > 0:
+            lines.append(f"{row.market:<12} {'':>12} {'':>12} {'':>10}  zu wenig Historie")
+            continue
+        level = str(s.trigger_level) if s.trigger_level is not None else "-"
+        distance = s.distance
+        gap = "-" if distance is None else f"{distance * Decimal(100):.2f} %"
+        state = "KAUFEN" if s.fires else "wartet"
+        lines.append(f"{row.market:<12} {s.price:>12} {level:>12} {gap:>10}  {state}")
+    firing = [row for row in rows if row.status.fires]
+    lines.append("")
+    if firing:
+        lines.append(f"{len(firing)} Markt/Märkte feuern: " + ", ".join(r.market for r in firing))
+        lines.append("Jetzt `run_gate check` — das Gate entscheidet über die Größe.")
+    else:
+        lines.append("Kein Markt feuert. Das ist der Normalfall und keine Aufforderung,")
+        lines.append("den nächstbesten zu nehmen.")
+    return "\n".join(lines)

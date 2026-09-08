@@ -83,3 +83,69 @@ def test_an_empty_series_does_not_crash():
     state = status(rule(), [], now=START)
     assert not state.fires
     assert state.warmup_missing == 1
+
+
+# --- scanner over many markets -------------------------------------------
+
+
+def test_the_scanner_puts_a_firing_market_first():
+    """A market that fires outranks every distance, however small."""
+    from arbcore.strategy.watch import scan
+
+    breaking_out = sideways() + [bar(60, "500"), bar(61, "500")]
+    near_miss = sideways() + [bar(60, "104"), bar(61, "104")]
+    rows = scan(
+        rule(),
+        {"near": near_miss, "firing": breaking_out},
+        now=START + timedelta(days=61),
+    )
+    assert [row.market for row in rows] == ["firing", "near"]
+    assert rows[0].status.fires
+    assert not rows[1].status.fires
+
+
+def test_the_scanner_sorts_the_waiting_markets_by_distance():
+    from arbcore.strategy.watch import scan
+
+    close = sideways() + [bar(60, "104"), bar(61, "104")]
+    far = sideways() + [bar(60, "50"), bar(61, "50")]
+    rows = scan(rule(), {"far": far, "close": close}, now=START + timedelta(days=61))
+    assert [row.market for row in rows] == ["close", "far"]
+
+
+def test_a_market_without_a_trigger_level_sorts_last_not_first():
+    """Unknown distance is not a small distance."""
+    from arbcore.strategy.watch import scan
+
+    rows = scan(
+        rule(),
+        {"thin": [bar(0, "100")], "known": sideways() + [bar(60, "104")]},
+        now=START + timedelta(days=60),
+    )
+    assert [row.market for row in rows] == ["known", "thin"]
+
+
+def test_the_scanner_says_plainly_when_nothing_fires():
+    from arbcore.strategy.watch import render_scan, scan
+
+    rows = scan(rule(), {"a": sideways()}, now=START + timedelta(days=60))
+    rendered = render_scan(rows)
+    assert "Kein Markt feuert" in rendered
+    assert "KAUFEN" not in rendered
+
+
+def test_the_scanner_names_the_markets_that_fire():
+    from arbcore.strategy.watch import render_scan, scan
+
+    breaking_out = sideways() + [bar(60, "500"), bar(61, "500")]
+    rendered = render_scan(
+        scan(rule(), {"btc": breaking_out}, now=START + timedelta(days=61))
+    )
+    assert "btc" in rendered
+    assert "KAUFEN" in rendered
+
+
+def test_an_empty_scan_does_not_crash():
+    from arbcore.strategy.watch import render_scan, scan
+
+    assert "Keine Märkte" in render_scan(scan(rule(), {}, now=START))

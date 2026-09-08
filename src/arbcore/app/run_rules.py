@@ -30,7 +30,7 @@ from ..marketdata.candles import (
     write_csv,
 )
 from ..strategy.rules import AVAILABLE, DonchianBreakout
-from ..strategy.watch import status
+from ..strategy.watch import render_scan, scan, status
 
 
 def _watch(args: argparse.Namespace, settings: DecideSettings) -> int:
@@ -147,6 +147,14 @@ def main() -> int:
     portfolio.add_argument("--rule", choices=sorted(AVAILABLE), default="donchian")
     portfolio.add_argument("--slippage", default="0.0005")
 
+    scan_cmd = sub.add_parser(
+        "scan", help="dieselbe Regel über viele Märkte: welcher feuert gerade?"
+    )
+    scan_cmd.add_argument(
+        "--csv", required=True, nargs="+", help="mehrere CSV-Dateien, eine je Markt"
+    )
+    scan_cmd.add_argument("--rule", choices=sorted(AVAILABLE), default="donchian")
+
     watch = sub.add_parser(
         "watch", help="live mitschauen: wie weit ist die Regel vom Auslösen entfernt?"
     )
@@ -209,6 +217,19 @@ def main() -> int:
             risk_per_trade=settings.risk.risk_per_trade,
         )
         print(portfolio_result.render())
+        return 0
+
+    if args.command == "scan":
+        scanned = {}
+        for path in args.csv:
+            try:
+                scanned[Path(path).stem] = load_csv(path)
+            except BadCandleData as exc:
+                print(str(exc))
+                return 1
+        rows = scan(AVAILABLE[args.rule], scanned, now=datetime.now(tz=UTC))
+        print(f"Regel: {AVAILABLE[args.rule].name}")
+        print(render_scan(rows))
         return 0
 
     if args.command == "watch":
