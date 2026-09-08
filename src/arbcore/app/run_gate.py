@@ -26,7 +26,11 @@ from ..decide.settings import DEFAULT_PATH, DecideSettings, SettingsError, load_
 from ..decide.setup_check import report as setup_report
 from ..decide.webhook import SignalQueue, make_server
 from ..domain.types import Side
-from ..review.performance import deviation_comparison, review_journal
+from ..review.performance import (
+    deviation_comparison,
+    review_journal,
+    source_comparison,
+)
 
 
 def _gate(settings: DecideSettings) -> SignalGate:
@@ -296,6 +300,11 @@ def main() -> int:
             comparison = deviation_comparison(journal)
             print(f"\nPlan befolgt:    {comparison['followed_plan']}")
             print(f"Abgewichen:      {comparison['discretionary']}")
+            by_source = source_comparison(journal)
+            if len(by_source) > 1:
+                print("\nNach Signalquelle — welche war es wert?")
+                for source, summary in by_source.items():
+                    print(f"  {source:<24} {summary}")
             return 0
     finally:
         journal.close()

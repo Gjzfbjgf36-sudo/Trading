@@ -549,3 +549,41 @@ def test_the_report_always_ends_with_one_next_step(tmp_path):
     from arbcore.decide.setup_check import report
 
     assert "NÄCHSTER SCHRITT" in report(_write_config(tmp_path))
+
+
+# --- comparing signal sources -------------------------------------------
+
+
+def _closed(journal: Journal, ref: str, source: str, exit_price: str) -> None:
+    journal.commit_plan(a_commitment(ref=ref, signal_source=source), now=NOW)
+    journal.record_outcome(
+        ref,
+        exit_price=Decimal(exit_price),
+        exit_reason=ExitReason.STOP_HIT,
+        now=NOW,
+        fee_rate=Decimal("0"),
+    )
+
+
+def test_sources_are_compared_separately(journal):
+    """A rule and an opinion can sit side by side and be measured against each other."""
+    from arbcore.review.performance import source_comparison
+
+    _closed(journal, "R1", "donchian_55_20", "63000")
+    _closed(journal, "O1", "claude_read", "57000")
+    comparison = source_comparison(journal)
+    assert set(comparison) == {"donchian_55_20", "claude_read"}
+    assert "1 Trades" in comparison["donchian_55_20"]
+
+
+def test_a_small_sample_per_source_says_so(journal):
+    from arbcore.review.performance import source_comparison
+
+    _closed(journal, "R1", "donchian_55_20", "63000")
+    assert "zu wenig Daten" in source_comparison(journal)["donchian_55_20"]
+
+
+def test_an_empty_journal_compares_nothing(journal):
+    from arbcore.review.performance import source_comparison
+
+    assert source_comparison(journal) == {}

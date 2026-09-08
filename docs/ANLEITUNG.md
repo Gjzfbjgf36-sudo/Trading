@@ -213,6 +213,35 @@ ganzen System — sie misst, was dich das Übergehen deiner eigenen Regel kostet
 
 ---
 
+## Meine Einschätzung mitlaufen lassen — und messen
+
+Du kannst mich einen Chart ansehen lassen und fragen, ob du kaufen sollst. Ich
+gebe dir eine Antwort. Aber schreib sie mit einer eigenen Quelle ins Journal:
+
+```bash
+python -m arbcore.app.run_gate commit ... --source claude_read
+```
+
+Dann steht sie neben der Regel, unter denselben Limits und derselben Disziplin.
+`review` vergleicht sie nach genug Trades:
+
+```
+Nach Signalquelle — welche war es wert?
+  claude_read              4 Trades, 1 Gewinner, Ø -3.18 pro Trade
+  donchian_55_20           3 Trades, 1 Gewinner, Ø -0.94 pro Trade
+```
+
+**Das ist der ehrliche Umgang mit dem Thema.** Statt darüber zu streiten, ob
+eine KI-Einschätzung etwas taugt, lässt du sie antreten und schaust nach.
+Gewinnt sie über 30 Trades gegen die Regel, ist das ein Ergebnis, das ich
+akzeptieren müsste. Verliert sie, hat es dich nichts gekostet.
+
+Wichtig: **Nicht mischen.** Ein Trade hat eine Quelle. Wenn du dir mein Urteil
+holst und dann doch der Regel folgst, weißt du hinterher nicht, was du gemessen
+hast.
+
+---
+
 ## Schritt 5 — Auswertung
 
 ```bash

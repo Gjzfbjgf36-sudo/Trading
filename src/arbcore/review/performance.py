@@ -167,6 +167,37 @@ def review_journal(journal: Journal) -> str:
     return "\n".join(lines)
 
 
+def source_comparison(journal: Journal) -> dict[str, str]:
+    """Results grouped by which source produced the signal.
+
+    The reason this exists: a rule and an opinion can sit side by side in the
+    same journal, sized by the same limits and closed under the same
+    discipline. After enough trades the comparison answers a question that no
+    amount of arguing can — did the opinion add anything, or did it cost?
+
+    An opinion that beats the rule over a usable sample is evidence worth
+    having. One that loses to it is the cheapest lesson available.
+    """
+    rows = journal.conn.execute(
+        "SELECT signal_source, pnl FROM commitments WHERE closed_at IS NOT NULL"
+    ).fetchall()
+    grouped: dict[str, list[Decimal]] = {}
+    for row in rows:
+        grouped.setdefault(row["signal_source"], []).append(Decimal(row["pnl"]))
+
+    out: dict[str, str] = {}
+    for source, values in sorted(grouped.items()):
+        total = sum(values, start=ZERO)
+        wins = sum(1 for v in values if v > ZERO)
+        average = (total / Decimal(len(values))).quantize(Decimal("0.01"))
+        note = "" if len(values) >= MIN_TRADES_FOR_A_VERDICT else "  (zu wenig Daten)"
+        out[source] = (
+            f"{len(values)} Trades, {wins} Gewinner, netto {total}, "
+            f"Ø {average} pro Trade{note}"
+        )
+    return out
+
+
 def deviation_comparison(journal: Journal) -> dict[str, str]:
     """Results of planned exits versus discretionary ones.
 
