@@ -1,5 +1,8 @@
 """Rules over real candles, and a backtest that cannot flatter itself."""
 
+import os
+from pathlib import Path
+
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -273,3 +276,53 @@ def test_undefined_statistics_are_none_not_zero():
     if not result.trades:
         assert result.win_rate is None
         assert result.expectancy is None
+
+
+# --- standalone script ---------------------------------------------------
+
+
+def test_the_standalone_script_runs_without_the_package(tmp_path):
+    """It exists for a machine that cannot install anything; it must not import us."""
+    import json
+    import subprocess
+    import sys
+    from datetime import UTC, datetime
+
+    rows = []
+    stamp = int(datetime(2023, 1, 1, tzinfo=UTC).timestamp())
+    price = 100.0
+    for i in range(300):
+        price += 1 if (i // 40) % 3 != 2 else -1
+        rows.append(
+            [stamp + i * 86400, f"{price:.1f}", f"{price + 1:.1f}",
+             f"{price - 1:.1f}", f"{price:.1f}", f"{price:.1f}", "1", 1]
+        )
+    payload = tmp_path / "ohlc.json"
+    payload.write_text(json.dumps({"error": [], "result": {"XXBTZUSD": rows}}))
+
+    script = Path(__file__).resolve().parents[1] / "standalone" / "backtest.py"
+    proc = subprocess.run(
+        [sys.executable, str(script), str(payload)],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,  # nowhere near the package
+        env={"PATH": os.environ.get("PATH", "")},  # no PYTHONPATH
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "Donchian" in proc.stdout
+    assert "Kosten" in proc.stdout
+
+
+def test_the_standalone_script_reports_a_kraken_error(tmp_path):
+    import json
+    import subprocess
+    import sys
+
+    payload = tmp_path / "bad.json"
+    payload.write_text(json.dumps({"error": ["EGeneral:Invalid arguments"], "result": {}}))
+    script = Path(__file__).resolve().parents[1] / "standalone" / "backtest.py"
+    proc = subprocess.run(
+        [sys.executable, str(script), str(payload)], capture_output=True, text=True
+    )
+    assert proc.returncode != 0
+    assert "Kraken meldet einen Fehler" in (proc.stdout + proc.stderr)
