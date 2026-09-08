@@ -116,12 +116,14 @@ favourable probabilities; an unmonitored condition is not a healthy one.
 | Rules in Python | `src/arbcore/strategy/rules.py` | The same logic as the Pine scripts, without a charting service |
 | Honest backtest | `src/arbcore/backtest/rule_backtest.py` | Costs are required; stop assumed before target within a bar |
 | Live watch | `src/arbcore/strategy/watch.py` | Distance to the trigger; signal only from closed bars |
+| Robustness | `src/arbcore/backtest/robustness.py` | Plateau or spike — whether the result may be believed |
+| Diversification | `src/arbcore/backtest/portfolio.py` | Same rule, many markets; reports whether the spread was real |
 
 ## Quick start
 
 ```bash
 make install
-make check      # ruff + mypy --strict + pytest (471 tests)
+make check      # ruff + mypy --strict + pytest (490 tests)
 
 # The honest scenario: retail fees, calm spreads
 python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario realistic

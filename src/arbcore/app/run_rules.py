@@ -16,11 +16,14 @@ import argparse
 import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
+from ..backtest.portfolio import run_portfolio
+from ..backtest.robustness import sweep
 from ..backtest.rule_backtest import BacktestCosts, run_backtest
 from ..decide.settings import DEFAULT_PATH, DecideSettings, SettingsError, load_settings
 from ..marketdata.candles import BadCandleData, fetch_ohlcv, load_csv, write_csv
-from ..strategy.rules import AVAILABLE
+from ..strategy.rules import AVAILABLE, DonchianBreakout
 from ..strategy.watch import status
 
 
@@ -115,6 +118,22 @@ def main() -> int:
     signal.add_argument("--csv", required=True)
     signal.add_argument("--rule", choices=sorted(AVAILABLE), default="donchian")
 
+    robust = sub.add_parser(
+        "robustness",
+        help="Plateau oder Zufallsspitze? Prüft, ob dem Ergebnis zu glauben ist",
+    )
+    robust.add_argument("--csv", required=True)
+    robust.add_argument("--slippage", default="0.0005")
+
+    portfolio = sub.add_parser(
+        "portfolio", help="dieselbe Regel über mehrere Märkte (Streuung)"
+    )
+    portfolio.add_argument(
+        "--csv", required=True, nargs="+", help="mehrere CSV-Dateien, eine je Markt"
+    )
+    portfolio.add_argument("--rule", choices=sorted(AVAILABLE), default="donchian")
+    portfolio.add_argument("--slippage", default="0.0005")
+
     watch = sub.add_parser(
         "watch", help="live mitschauen: wie weit ist die Regel vom Auslösen entfernt?"
     )
@@ -134,6 +153,50 @@ def main() -> int:
     except SettingsError as exc:
         print(f"Konfiguration: {exc}")
         return 2
+
+    if args.command == "robustness":
+        try:
+            candles = load_csv(args.csv)
+        except BadCandleData as exc:
+            print(str(exc))
+            return 1
+        grid = [
+            (entry, exit_)
+            for entry in (30, 40, 55, 70, 90)
+            for exit_ in (10, 15, 20, 25, 30)
+        ]
+        report = sweep(
+            lambda e, x: DonchianBreakout(entry_length=e, exit_length=x),
+            grid,
+            candles,
+            costs=BacktestCosts(
+                fee_rate=settings.fee_rate, slippage=Decimal(args.slippage)
+            ),
+            starting_capital=settings.starting_capital,
+            risk_per_trade=settings.risk.risk_per_trade,
+        )
+        print(report.render())
+        return 0
+
+    if args.command == "portfolio":
+        markets = {}
+        for path in args.csv:
+            try:
+                markets[Path(path).stem] = load_csv(path)
+            except BadCandleData as exc:
+                print(str(exc))
+                return 1
+        portfolio_result = run_portfolio(
+            AVAILABLE[args.rule],
+            markets,
+            costs=BacktestCosts(
+                fee_rate=settings.fee_rate, slippage=Decimal(args.slippage)
+            ),
+            capital_per_market=settings.starting_capital / Decimal(len(markets)),
+            risk_per_trade=settings.risk.risk_per_trade,
+        )
+        print(portfolio_result.render())
+        return 0
 
     if args.command == "watch":
         return _watch(args, settings)
@@ -158,22 +221,22 @@ def main() -> int:
     rule = AVAILABLE[args.rule]
 
     if args.command == "signal":
-        result = rule.evaluate(candles)
-        if result is None:
+        current = rule.evaluate(candles)
+        if current is None:
             print(f"Zu wenig Historie für {rule.name} ({len(candles)} Kerzen).")
             return 1
-        print(f"Regel      {result.source}")
-        print(f"Gesehen    {result.observed}")
-        print(f"Feuert     {'JA' if result.fires else 'nein'}")
-        if result.fires:
-            print(f"  Einstieg {result.entry}")
-            print(f"  Stop     {result.stop}")
-            print(f"  Ziel     {result.target or 'keins (Ausstieg per Regel)'}")
+        print(f"Regel      {current.source}")
+        print(f"Gesehen    {current.observed}")
+        print(f"Feuert     {'JA' if current.fires else 'nein'}")
+        if current.fires:
+            print(f"  Einstieg {current.entry}")
+            print(f"  Stop     {current.stop}")
+            print(f"  Ziel     {current.target or 'keins (Ausstieg per Regel)'}")
             print("\nJetzt `run_gate check` — das Gate entscheidet über die Größe.")
-        return 0 if result.fires else 1
+        return 0 if current.fires else 1
 
     costs = BacktestCosts(fee_rate=settings.fee_rate, slippage=Decimal(args.slippage))
-    outcome = run_backtest(
+    backtest_result = run_backtest(
         rule,
         candles,
         costs=costs,
@@ -184,7 +247,7 @@ def main() -> int:
     fee_pct = (costs.fee_rate * Decimal(100)).quantize(Decimal("0.001"))
     slip_pct = (costs.slippage * Decimal(100)).quantize(Decimal("0.001"))
     print(f"Kosten: {fee_pct} % Gebühr, {slip_pct} % Slippage pro Seite\n")
-    print(outcome.render(settings.starting_capital))
+    print(backtest_result.render(settings.starting_capital))
     return 0
 
 

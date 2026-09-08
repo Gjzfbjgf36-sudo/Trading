@@ -148,6 +148,45 @@ null. Drei Entscheidungen sind bewusst gegen uns getroffen:
   anzunehmen würde genau die mehrdeutigen Fälle schönrechnen.
 - **Gebühren auf beiden Seiten**, plus Slippage bei Ein- und Ausstieg.
 
+### Darf ich dem Backtest glauben?
+
+Die naheliegende Frage „welcher Parameter ist am besten?" ist die falsche. Wer
+zwanzig Varianten testet und die beste nimmt, hat aus zwanzig Ziehungen das
+Maximum gewählt — dessen Ergebnis ist systematisch zu gut, ganz ohne Absicht.
+
+```bash
+python -m arbcore.app.run_rules robustness --csv data/btc.csv
+```
+
+Rechnet 25 Parametersätze durch und sagt dir, ob der gute Bereich ein **Plateau**
+oder eine **Spitze** ist:
+
+- **Plateau** — 40/15, 55/20 und 70/25 funktionieren ähnlich → gutes Zeichen.
+  Nimm einen Wert aus der Mitte, **nicht den besten**.
+- **Spitze** — nur 55/20 funktioniert, Nachbarn verlieren → fast immer
+  angepasstes Rauschen. Einen Markt, der zwischen 54 und 55 Tagen umschaltet,
+  gibt es nicht.
+
+### Streuung — die einzige belegte Verbesserung ohne Anpassen
+
+```bash
+python -m arbcore.app.run_rules portfolio --csv data/BTC.csv data/ETH.csv data/SOL.csv
+```
+
+Dieselbe Regel auf mehreren Märkten. Es wird **nichts optimiert** — die Regel
+läuft nur öfter. Deshalb erzeugt es keinen Überanpassungs-Verdacht.
+
+Die Ausgabe weist aus, ob die Streuung echt war:
+
+```
+Summe der Einzel-Drawdowns: 57.14
+Streuungsvorteil:           35.18 %
+```
+
+Unter ~15 % heisst: Die Märkte verlieren gleichzeitig. Bei Krypto-Paaren ist
+das der Normalfall — fast alle folgen Bitcoin. Fünf Altcoins sind kaum mehr
+Streuung als Bitcoin allein.
+
 ### Live mitschauen
 
 ```bash
