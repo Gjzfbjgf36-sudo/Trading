@@ -114,12 +114,13 @@ favourable probabilities; an unmonitored condition is not a healthy one.
 | Candles | `src/arbcore/marketdata/candles.py` | Validated OHLC from CSV or a public endpoint via ccxt |
 | Rules in Python | `src/arbcore/strategy/rules.py` | The same logic as the Pine scripts, without a charting service |
 | Honest backtest | `src/arbcore/backtest/rule_backtest.py` | Costs are required; stop assumed before target within a bar |
+| Live watch | `src/arbcore/strategy/watch.py` | Distance to the trigger; signal only from closed bars |
 
 ## Quick start
 
 ```bash
 make install
-make check      # ruff + mypy --strict + pytest (463 tests)
+make check      # ruff + mypy --strict + pytest (471 tests)
 
 # The honest scenario: retail fees, calm spreads
 python -m arbcore.app.run_paper --ticks 90000 --tick-ms 5000 --scenario realistic

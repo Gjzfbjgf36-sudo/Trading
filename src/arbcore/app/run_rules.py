@@ -13,12 +13,82 @@
 from __future__ import annotations
 
 import argparse
+import time
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from ..backtest.rule_backtest import BacktestCosts, run_backtest
-from ..decide.settings import DEFAULT_PATH, SettingsError, load_settings
+from ..decide.settings import DEFAULT_PATH, DecideSettings, SettingsError, load_settings
 from ..marketdata.candles import BadCandleData, fetch_ohlcv, load_csv, write_csv
 from ..strategy.rules import AVAILABLE
+from ..strategy.watch import status
+
+
+def _watch(args: argparse.Namespace, settings: DecideSettings) -> int:
+    """Poll und zeige den Abstand zum Auslöser.
+
+    Das Signal kommt immer aus abgeschlossenen Kerzen. Die laufende Kerze wird
+    nur angezeigt — wer auf ihr handelt, handelt eine andere Regel als die
+    getestete, und zwar eine, die häufiger und schlechter feuert.
+    """
+    rule = AVAILABLE[args.rule]
+    duration = _bar_duration(args.timeframe)
+
+    if args.csv:
+        # Offline-Durchlauf: dieselbe Anzeige, ohne Netz. Gut zum Anschauen,
+        # bevor man sie stundenlang laufen lässt.
+        try:
+            candles = load_csv(args.csv)
+        except BadCandleData as exc:
+            print(str(exc))
+            return 1
+        for end in range(max(61, len(candles) - 10), len(candles) + 1):
+            state = status(
+                rule, candles[:end], now=candles[end - 1].at, bar_duration=duration
+            )
+            print(state.render())
+        return 0
+
+    print(f"Beobachte {args.symbol} auf {args.exchange} mit {rule.name}.")
+    print(f"Abfrage alle {args.interval}s. Beenden mit Strg+C.")
+    print("Das Signal kommt aus geschlossenen Kerzen — die laufende wird nur angezeigt.\n")
+    last_line = ""
+    try:
+        while True:
+            try:
+                candles = fetch_ohlcv(args.exchange, args.symbol, args.timeframe, 400)
+            except BadCandleData as exc:
+                print(f"Datenabruf fehlgeschlagen: {exc}")
+                return 1
+            state = status(
+                rule, candles, now=datetime.now(UTC), bar_duration=duration
+            )
+            line = state.render()
+            if state.fires:
+                print(line)
+                _alert_sound()
+                return 0
+            # Eine Zeile, die sich aktualisiert, statt endloser Ausgabe.
+            if line != last_line:
+                print(f"\r{line:<100}", end="", flush=True)
+                last_line = line
+            time.sleep(max(5, args.interval))
+    except KeyboardInterrupt:
+        print("\nBeendet.")
+        return 0
+
+
+def _bar_duration(timeframe: str) -> timedelta:
+    units = {"m": "minutes", "h": "hours", "d": "days", "w": "weeks"}
+    suffix = timeframe[-1:].lower()
+    if suffix not in units or not timeframe[:-1].isdigit():
+        return timedelta(days=1)
+    return timedelta(**{units[suffix]: int(timeframe[:-1])})
+
+
+def _alert_sound() -> None:
+    """Terminal-Piepser. Damit man es hört, wenn man nicht hinschaut."""
+    print("\a", end="", flush=True)
 
 
 def main() -> int:
@@ -45,6 +115,18 @@ def main() -> int:
     signal.add_argument("--csv", required=True)
     signal.add_argument("--rule", choices=sorted(AVAILABLE), default="donchian")
 
+    watch = sub.add_parser(
+        "watch", help="live mitschauen: wie weit ist die Regel vom Auslösen entfernt?"
+    )
+    watch.add_argument("--rule", choices=sorted(AVAILABLE), default="donchian")
+    watch.add_argument("--exchange", default="kraken")
+    watch.add_argument("--symbol", default="BTC/USD")
+    watch.add_argument("--timeframe", default="1d")
+    watch.add_argument(
+        "--interval", type=int, default=60, help="Sekunden zwischen zwei Abfragen"
+    )
+    watch.add_argument("--csv", default=None, help="statt live: eine CSV durchspielen")
+
     args = parser.parse_args()
 
     try:
@@ -52,6 +134,9 @@ def main() -> int:
     except SettingsError as exc:
         print(f"Konfiguration: {exc}")
         return 2
+
+    if args.command == "watch":
+        return _watch(args, settings)
 
     if args.command == "fetch":
         try:

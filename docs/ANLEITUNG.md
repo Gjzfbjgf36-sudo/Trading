@@ -131,6 +131,36 @@ null. Drei Entscheidungen sind bewusst gegen uns getroffen:
   anzunehmen würde genau die mehrdeutigen Fälle schönrechnen.
 - **Gebühren auf beiden Seiten**, plus Slippage bei Ein- und Ausstieg.
 
+### Live mitschauen
+
+```bash
+python -m arbcore.app.run_rules watch --exchange kraken --symbol BTC/USD
+```
+
+Läuft und zeigt fortlaufend, wie weit die Regel vom Auslösen entfernt ist:
+
+```
+Kurs 27897.85  |  Auslöser 33233.39  |  noch 19.13 %  |  Kerzenschluss in 6h 12m  |  kein Signal
+```
+
+Und wenn sie feuert, mit Ton:
+
+```
+   ####  KAUFEN  ####
+
+   Einstieg   130
+   Stop       124.72   <- sofort mitsetzen
+   Regel      donchian_20_10
+   Gesehen    Schluss 130, 20-Tage-Hoch 105.04, ATR 2.64
+```
+
+**Wichtig:** Das Signal kommt immer aus **abgeschlossenen** Kerzen. Die laufende
+Kerze wird nur angezeigt. Wer auf ihr handelt, handelt eine andere Regel als die
+getestete — und zwar eine, die häufiger und schlechter feuert.
+
+Zum Anschauen ohne Netz: `watch --csv data/btc.csv` spielt die letzten Kerzen
+durch.
+
 Feuert die Regel, gibst du Einstieg und Stop ins Gate — der Ablauf bleibt
 derselbe.
 
