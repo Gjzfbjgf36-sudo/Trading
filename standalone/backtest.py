@@ -62,6 +62,17 @@ def _load_kraken(text: str) -> list[Candle]:
     if not series:
         raise SystemExit("Keine Kerzen im JSON gefunden.")
     # Kraken: [zeit, open, high, low, close, vwap, volumen, anzahl]
+    #
+    # `last` ist der Zeitstempel, bis zu dem Kraken die Daten als abgeschlossen
+    # ansieht. Die Kerze danach laeuft noch: ihr Hoch, Tief und Schluss aendern
+    # sich bis zum Tagesende. Eine Regel, die darauf ein Signal bildet, misst
+    # eine Kerze, die es so nie gab. Deshalb wird sie verworfen.
+    committed = result.get("last")
+    rows = series[0]
+    if isinstance(committed, int):
+        rows = [row for row in rows if int(row[0]) <= committed]
+    if not rows:
+        raise SystemExit("Nur unfertige Kerzen im JSON — keine abgeschlossenen Daten.")
     return [
         Candle(
             at=datetime.fromtimestamp(int(row[0]), tz=UTC),
@@ -70,7 +81,7 @@ def _load_kraken(text: str) -> list[Candle]:
             low=Decimal(str(row[3])),
             close=Decimal(str(row[4])),
         )
-        for row in series[0]
+        for row in rows
     ]
 
 

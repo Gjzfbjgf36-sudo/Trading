@@ -325,3 +325,32 @@ def test_the_standalone_script_reports_a_kraken_error(tmp_path):
     )
     assert proc.returncode != 0
     assert "Kraken meldet einen Fehler" in (proc.stdout + proc.stderr)
+
+
+def test_the_standalone_script_drops_the_unfinished_candle(tmp_path):
+    """Kraken's `last` marks where committed data ends; the row after it is still moving."""
+    import json
+    import subprocess
+    import sys
+    from datetime import UTC, datetime
+
+    stamp = int(datetime(2023, 1, 1, tzinfo=UTC).timestamp())
+    rows = [
+        [stamp + i * 86400, "100.0", "101.0", "99.0", "100.0", "100.0", "1", 1]
+        for i in range(300)
+    ]
+    payload = tmp_path / "ohlc.json"
+    script = Path(__file__).resolve().parents[1] / "standalone" / "backtest.py"
+
+    def candle_count(document: dict[str, object]) -> int:
+        payload.write_text(json.dumps(document))
+        proc = subprocess.run(
+            [sys.executable, str(script), str(payload)], capture_output=True, text=True
+        )
+        assert proc.returncode == 0, proc.stderr
+        line = next(ln for ln in proc.stdout.splitlines() if ln.startswith("Kerzen"))
+        return int(line.split()[1])
+
+    assert candle_count({"error": [], "result": {"XXBTZUSD": rows}}) == 300
+    committed = {"error": [], "result": {"XXBTZUSD": rows, "last": rows[-2][0]}}
+    assert candle_count(committed) == 299

@@ -8,10 +8,15 @@ Regel gegen Kurse, die wirklich passiert sind.
 
 * Quelle: `https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1440`
 * Paar: `XXBTZUSD`, Intervall 1440 Minuten (Tageskerzen)
-* 721 Kerzen, 2024-09-18 bis 2026-09-08
+* 720 abgeschlossene Kerzen, 2024-09-18 bis 2026-09-07
 * Abgelegt als `records/btcusd_1d_kraken.csv`
 
-Kraken liefert über diesen Endpunkt maximal 720 Kerzen. Zwei Jahre Tagesdaten
+Kraken markiert im Feld `last`, bis wohin die Daten abgeschlossen sind. Die
+Kerze danach läuft noch — ihr Hoch, Tief und Schluss ändern sich bis zum
+Tagesende. Sie wird verworfen, sonst misst die Regel eine Kerze, die es so nie
+gab. Von 721 gelieferten Zeilen bleiben 720.
+
+Kraken liefert über diesen Endpunkt maximal 720 abgeschlossene Kerzen. Zwei Jahre Tagesdaten
 sind alles, was ohne kostenpflichtige Historie zu bekommen ist — und zwei Jahre
 sind für eine Regel, die etwa drei Trades pro Jahr macht, zu wenig. Das ist
 keine Nebenbemerkung, sondern das Hauptergebnis.
