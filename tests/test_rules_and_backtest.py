@@ -1,10 +1,9 @@
 """Rules over real candles, and a backtest that cannot flatter itself."""
 
 import os
-from pathlib import Path
-
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
