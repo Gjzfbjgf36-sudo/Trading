@@ -107,6 +107,100 @@ Und es kostet nichts: keine Parameteranpassung, keine zusätzliche Annahme, kein
 weiterer Freiheitsgrad, an dem man sich selbst betrügen kann. Es ist die einzige
 Verbesserung in diesem ganzen Report, die man geschenkt bekommt.
 
+## Welcher Hebel wirkt wirklich?
+
+Vier naheliegende Stellschrauben, alle an denselben Daten gemessen statt
+behauptet. Portfolio aus drei Märkten, 1000 Startkapital.
+
+**1. Niedrigere Gebühren — wirkt kaum, und beweist etwas Wichtigeres.**
+
+| Gebühr je Seite | Donchian | Engulfing |
+|---|---|---|
+| 0,26 % (Taker) | −15,81 | +5,96 |
+| 0,16 % (Maker) | −14,25 | +10,17 |
+| 0,10 % (Großvolumen) | −13,31 | +12,71 |
+| **0,00 % (unmöglich)** | **−11,75** | +16,95 |
+
+Donchian verliert **auch bei null Gebühren**. Damit ist die häufigste Erklärung
+für schlechte Ergebnisse ("die Kosten fressen die Rendite") hier widerlegt: es
+gibt keine Rendite, die gefressen werden könnte. Gebühren zu senken ist richtig,
+aber es macht aus einer Regel ohne Vorteil keine mit.
+
+**2. Mehr Risiko je Trade — wirkt nicht, es multipliziert nur.**
+
+| Risiko je Trade | Donchian | Engulfing |
+|---|---|---|
+| 0,5 % | −7,98 | +3,14 |
+| 1,0 % | −15,81 | +5,96 |
+| 2,0 % | −31,05 | +10,63 |
+| 5,0 % | −73,66 | +16,89 |
+
+Exakt linear in beide Richtungen. Positionsgröße ändert **nie** den Vorteil
+einer Regel, nur die Größe des Ausschlags. Deshalb steht in der Spezifikation
+des Betreibers "niemals das Risiko erhöhen, weil die Strategie Geld verliert" —
+diese Tabelle ist der Beleg dafür.
+
+**3. Mehr Märkte — wirkt, siehe oben.** Rund 50 % weniger Drawdown, geschenkt.
+
+**4. Der Ausstieg — der einzige Hebel, der die Ergebnisse dreht.**
+
+Donchian steigt aus, wenn der Kurs unter das Tief der letzten 20 Tage fällt. Das
+dauert lange, und in dieser Zeit gibt die Position einen großen Teil des Gewinns
+zurück. Ein zusätzlicher Zeit-Stop schließt die Position nach N Kerzen:
+
+| Zeit-Stop | BTC | ETH | SOL | Summe | Trades |
+|---|---|---|---|---|---|
+| 5 | +3,60 | +14,75 | +0,53 | +18,88 | 36 |
+| 8 | +10,60 | +14,35 | +6,10 | +31,04 | 32 |
+| **10** | +9,82 | +20,22 | +8,83 | **+38,87** | 27 |
+| 15 | +8,86 | +25,60 | +4,33 | +38,80 | 26 |
+| 20 | −1,82 | +21,55 | −5,57 | +14,16 | 20 |
+| 30 | −3,12 | +13,85 | −18,98 | −8,25 | 19 |
+| kein | −8,14 | +11,31 | −18,98 | −15,81 | 16 |
+
+Das ist kein einzelner Ausreißer, sondern ein **breiter Bereich von 5 bis 15,
+der auf allen drei Märkten gleichzeitig positiv ist**, und ein sauberes Gefälle
+zu längeren Haltedauern. Drei Märkte sind drei halbwegs unabhängige Bestätigungen.
+
+### Der eigentliche Test: hält es außerhalb des Zeitraums?
+
+Ein Ergebnis, das man durch Suchen gefunden hat, ist wertlos, bis es an Daten
+funktioniert, an denen es nicht gefunden wurde. Zwei Jahre in zwei Hälften:
+
+| Zeit-Stop | 1. Hälfte (Märkte +80 bis +99 %) | 2. Hälfte (Märkte −32 bis −57 %) |
+|---|---|---|
+| 5 | −4,70 | +22,54 |
+| **10** | **+10,61** | **+26,31** |
+| **15** | **+13,43** | **+28,73** |
+| 20 | +18,89 | −8,06 |
+| 30 | +5,59 | −11,11 |
+| kein | −16,35 | −12,50 |
+
+**10 und 15 sind in beiden Hälften positiv — in einem starken Aufwärtsmarkt und
+in einem schweren Abwärtsmarkt.** Ohne Zeit-Stop verliert die Regel in beiden.
+Das ist die stärkste Evidenz in diesem ganzen Projekt.
+
+**Was trotzdem dagegen spricht**, und es muss dagegen sprechen, sonst wäre es
+keine ehrliche Auswertung:
+
+* 27 Trades im besten Fall, 8 in der zweiten Hälfte. Weiter unter 30.
+* Ich habe elf Werte durchprobiert und den besten berichtet. Dass der
+  Nachbarwert 15 fast identisch abschneidet, macht es glaubwürdiger — beweist
+  es aber nicht.
+* Nach Regel des Repositories wird **nicht der beste Wert genommen**, sondern
+  einer aus der Mitte des Plateaus: **12**, nicht 10.
+
+**Status: Hypothese, nicht Ergebnis.** Sie gehört in die Papier-Phase, mit
+vorher festgelegtem Wert, und wird dort gemessen — nicht rückwirkend bestätigt.
+
+### Und die 48 verworfenen Signale
+
+Donchian hat 16 Trades gemacht und **48 weitere Signale verworfen**, weil bereits
+eine Position offen war. Dreiviertel dessen, was die Regel gesehen hat, wurde nie
+gehandelt. Das ist der größte ungenutzte Posten überhaupt — und der Grund, warum
+der Zeit-Stop so viel bewirkt: er macht Platz. Bei Zeit-Stop 10 steigt die
+Trade-Zahl von 16 auf 27, ohne dass die Regel verändert wurde.
+
 ## Was daraus folgt
 
 1. **Tageskerzen liefern zu wenige Trades — auch über drei Märkte.** 16 bis 21
