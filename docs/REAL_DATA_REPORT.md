@@ -1,4 +1,4 @@
-# Erster Lauf gegen echte Kurse — BTC/USD, Kraken, Tageskerzen
+# Erster Lauf gegen echte Kurse — BTC, ETH, SOL bei Kraken, Tageskerzen
 
 Bis zu diesem Report war jede Zahl in diesem Repository entweder aus einem
 synthetischen Markt oder aus einem Testfall. Das hier ist der erste Lauf einer
@@ -6,10 +6,11 @@ Regel gegen Kurse, die wirklich passiert sind.
 
 ## Datengrundlage
 
-* Quelle: `https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1440`
-* Paar: `XXBTZUSD`, Intervall 1440 Minuten (Tageskerzen)
+* Quelle: `https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1440` (ebenso `ETHUSD`, `SOLUSD`)
+* Paare: `XXBTZUSD`, `XETHZUSD`, `SOLUSD`, Intervall 1440 Minuten (Tageskerzen)
 * 720 abgeschlossene Kerzen, 2024-09-18 bis 2026-09-07
-* Abgelegt als `records/btcusd_1d_kraken.csv`
+* Abgelegt als `records/btcusd_1d_kraken.csv`, `records/ethusd_1d_kraken.csv`,
+  `records/solusd_1d_kraken.csv`
 
 Kraken markiert im Feld `last`, bis wohin die Daten abgeschlossen sind. Die
 Kerze danach läuft noch — ihr Hoch, Tief und Schluss ändern sich bis zum
@@ -60,16 +61,65 @@ dass beide Zahlen aus zu wenig Beobachtungen stammen.
 Genau dafür ist der Sweep da. Ohne ihn hätte hier gestanden: "Donchian 40/10
 macht +3,6 % in zwei Jahren." Das wäre die Sorte Satz, die Geld kostet.
 
+## Drei Märkte statt einem
+
+Dieselben zwei Jahre für ETH/USD und SOL/USD, ebenfalls über den Browser geholt
+und mit `import-kraken` umgewandelt. Einzeln, Donchian 55/20:
+
+| Markt | Trades | Treffer | Netto auf 1000 | Max. DD |
+|---|---|---|---|---|
+| BTC/USD | 6 | 33 % | −24,41 | 33,89 |
+| ETH/USD | 4 | 50 % | **+33,93** | 11,12 |
+| SOL/USD | 6 | **0 %** | −56,94 | 56,94 |
+
+Sechs Verlierer aus sechs Trades bei SOL, und ein Plus bei ETH. Aus vier
+beziehungsweise sechs Beobachtungen folgt daraus nichts über die Märkte — es
+zeigt nur, wie weit das Ergebnis streut, wenn man dieselbe Regel auf drei
+ähnliche Dinge anwendet.
+
+Der Sweep bestätigt das von der anderen Seite. Bei ETH sind **92 % aller
+Parametersätze profitabel** und der Prüfer meldet PLATEAU; bei SOL sind es
+**0 %** und KEIN PLATEAU. Dieselbe Regel, derselbe Zeitraum, gegensätzliches
+Urteil. Ein Plateau aus zwei bis vier Trades ist kein Plateau, sondern eine
+Ansammlung von Zufällen, die zufällig in dieselbe Richtung zeigen. Die Warnung
+unter dem ETH-Sweep sagt genau das.
+
+Als Portfolio, Kapital gedrittelt:
+
+| Regel | Trades | Netto auf 1000 | Kombinierter DD | Summe Einzel-DD | Streuungsvorteil |
+|---|---|---|---|---|---|
+| Donchian 55/20 | 16 | −15,81 | 16,35 | 33,99 | **51,9 %** |
+| Engulfing | 21 | +5,96 | 17,19 | 31,76 | **45,9 %** |
+
+**Der Streuungsvorteil ist das einzige belastbare Ergebnis dieses Reports.** Die
+Rendite hängt an 16 beziehungsweise 21 Trades und ist damit Rauschen. Der
+Drawdown-Vergleich hängt daran nicht: er misst, ob die drei Märkte *gleichzeitig*
+verlieren, und das wird an jedem einzelnen Tag der zwei Jahre gemessen, nicht nur
+an den Handelstagen. Die drei Märkte fallen nicht im Gleichschritt — der
+kombinierte Rückgang ist rund halb so groß wie die Summe der einzelnen.
+
+Das ist bemerkenswert, weil es der landläufigen Annahme widerspricht, Krypto sei
+"sowieso alles Bitcoin". Über diesen Zeitraum stimmt das für die Zeitpunkte der
+Verluste nicht. An 52 % der Tage war mehr als eine Position offen, die
+Rückgänge fielen trotzdem nicht zusammen.
+
+Und es kostet nichts: keine Parameteranpassung, keine zusätzliche Annahme, kein
+weiterer Freiheitsgrad, an dem man sich selbst betrügen kann. Es ist die einzige
+Verbesserung in diesem ganzen Report, die man geschenkt bekommt.
+
 ## Was daraus folgt
 
-1. **Tageskerzen auf einem einzelnen Markt liefern zu wenige Trades.** Um 30
-   Trades zu erreichen, braucht es entweder mehr Historie (mehrere Jahre, also
-   bezahlte Daten), mehr Märkte parallel (`run_rules portfolio`), oder ein
-   kürzeres Intervall — wobei Letzteres den Kostenanteil pro Trade erhöht, siehe
-   `run_gate costs`.
-2. **Die Reihenfolge bleibt: erst messen, dann urteilen.** Der Betreiber hat
-   jetzt eine reale, reproduzierbare Nullmessung statt einer Vermutung.
-3. **Nichts an diesem Ergebnis rechtfertigt Echtgeld.** Es rechtfertigt die
+1. **Tageskerzen liefern zu wenige Trades — auch über drei Märkte.** 16 bis 21
+   statt 30. Drei Märkte haben die Zahl fast vervierfacht und reichen trotzdem
+   nicht. Der Weg zu 30 führt über noch mehr Märkte, mehrere Jahre Historie
+   (bezahlte Daten) oder ein kürzeres Intervall — wobei Letzteres den
+   Kostenanteil pro Trade erhöht, siehe `run_gate costs`.
+2. **Streuung ist der einzige gemessene Vorteil.** Rund 50 % weniger Drawdown,
+   ohne Parameteranpassung. Das gilt unabhängig davon, ob die Regel Geld
+   verdient.
+3. **Die Reihenfolge bleibt: erst messen, dann urteilen.** Der Betreiber hat
+   jetzt eine reale, reproduzierbare Messung statt einer Vermutung.
+4. **Nichts an diesem Ergebnis rechtfertigt Echtgeld.** Es rechtfertigt die
    Papier-Phase, und zwar über mehrere Märkte gleichzeitig.
 
 ## Reproduzieren
@@ -78,6 +128,8 @@ macht +3,6 % in zwei Jahren." Das wäre die Sorte Satz, die Geld kostet.
 python -m arbcore.app.run_rules backtest --csv records/btcusd_1d_kraken.csv --rule donchian
 python -m arbcore.app.run_rules backtest --csv records/btcusd_1d_kraken.csv --rule engulfing
 python -m arbcore.app.run_rules robustness --csv records/btcusd_1d_kraken.csv
+python -m arbcore.app.run_rules portfolio --csv records/btcusd_1d_kraken.csv \
+    records/ethusd_1d_kraken.csv records/solusd_1d_kraken.csv
 ```
 
 Ohne installiertes Paket, nur mit der Kraken-Antwort als Datei:
